@@ -116,7 +116,11 @@ function cmdReview(flags, cwd) {
   const result = runReview({ cwd, prompt, model: flags.model });
 
   if (scope.truncated) {
-    out(`> Note: the diff was large and was truncated. Files omitted or only partially included: ${scope.droppedFiles.join(", ")}`);
+    const MAX_LISTED = 10;
+    const shown = scope.droppedFiles.slice(0, MAX_LISTED);
+    const extra = scope.droppedFiles.length - shown.length;
+    const list = shown.join(", ") + (extra > 0 ? `, and ${extra} more` : "");
+    out(`> Note: the diff was large and was truncated. Files omitted or only partially included: ${list}`);
     out("");
   }
 

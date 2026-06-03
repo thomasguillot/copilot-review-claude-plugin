@@ -72,6 +72,19 @@ test("review streams large output without truncation", () => {
   assert.match(r.stdout, /LINE 2000/); // last line present => nothing truncated
 });
 
+test("review truncation notice caps the dropped-files list", () => {
+  const dir = tempRepo();
+  write(dir, "a.txt", "x\n");
+  git(dir, "add", "a.txt");
+  git(dir, "commit", "-q", "-m", "init");
+  const big = "y\n".repeat(10000); // ~20 KB each
+  for (let i = 0; i < 25; i++) write(dir, `f${i}.txt`, big); // ~500 KB total, exceeds the 200 KB cap
+  const r = companion(["review"], dir);
+  assert.equal(r.code, 0);
+  assert.match(r.stdout, /truncated/);
+  assert.match(r.stdout, /and \d+ more/); // list capped, remainder summarized
+});
+
 test("review --scope branch with no detectable base gives a hint", () => {
   const dir = tempRepo();
   // Move to a branch name that won't be auto-detected, with no main/master/remote.
