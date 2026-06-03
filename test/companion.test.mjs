@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
+import { dirname, join, delimiter } from "node:path";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { run } from "../scripts/lib/process.mjs";
@@ -15,7 +15,7 @@ const STUB_DIR = join(here, "fixtures", "bin");
 function companion(args, cwd, extraEnv = {}) {
   return run("node", [COMPANION, ...args], {
     cwd,
-    env: { ...process.env, PATH: `${STUB_DIR}:${process.env.PATH}`, ...extraEnv }
+    env: { ...process.env, PATH: `${STUB_DIR}${delimiter}${process.env.PATH ?? ""}`, ...extraEnv }
   });
 }
 

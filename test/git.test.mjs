@@ -161,7 +161,7 @@ test("size cap truncates and records dropped files", () => {
   assert.ok(r.droppedFiles.length > 0);
 });
 
-test("working-tree: untracked symlink is not dereferenced (no external leak)", () => {
+test("working-tree: untracked symlink is not dereferenced (no external leak)", { skip: process.platform === "win32" ? "symlink creation needs elevated privileges on Windows" : false }, () => {
   const dir = tempRepo();
   write(dir, "a.txt", "x\n");
   git(dir, "add", "a.txt");
