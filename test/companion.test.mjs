@@ -91,3 +91,10 @@ test("review --scope branch with an invalid base errors clearly", () => {
   assert.equal(r.code, 1);
   assert.match(r.stdout, /Cannot review|Could not diff against base/);
 });
+
+test("review with an invalid --scope value fails fast", () => {
+  const dir = tempRepo();
+  const r = companion(["review", "--scope", "brnach"], dir);
+  assert.equal(r.code, 2);
+  assert.match(r.stdout, /Invalid --scope/);
+});

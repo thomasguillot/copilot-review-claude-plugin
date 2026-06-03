@@ -109,3 +109,26 @@ test("size cap still reviews a single oversized first file (no silent skip)", ()
   assert.equal(r.truncated, true);
   assert.match(r.text, /huge\.txt/);
 });
+
+test("working-tree: untracked binary file is not inlined", () => {
+  const dir = tempRepo();
+  write(dir, "a.txt", "x\n");
+  git(dir, "add", "a.txt");
+  git(dir, "commit", "-q", "-m", "init");
+  writeFileSync(join(dir, "blob.bin"), Buffer.from([0x00, 0x01, 0x02, 0x00, 0xff]));
+  const r = resolveScope({ scope: "working-tree", cwd: dir });
+  assert.match(r.text, /blob\.bin/);
+  assert.match(r.text, /binary file omitted/);
+  assert.doesNotMatch(r.text, /\x00/);
+});
+
+test("branch base detection skips the current branch when it equals HEAD", () => {
+  const dir = tempRepo();
+  // On 'main' with a commit; main === HEAD, so it must NOT be chosen as base.
+  write(dir, "a.txt", "base\n");
+  git(dir, "add", "a.txt");
+  git(dir, "commit", "-q", "-m", "base");
+  const r = resolveScope({ scope: "branch", cwd: dir });
+  // No other base exists, so it falls back with the "no base branch detected" note.
+  assert.match(r.scopeLabel, /no base branch detected/);
+});
