@@ -76,6 +76,11 @@ function cmdSetup(flags, cwd) {
 }
 
 function cmdReview(flags, cwd) {
+  if (flags.scope !== "working-tree" && flags.scope !== "branch") {
+    out(`Invalid --scope '${flags.scope}'. Use working-tree or branch.`);
+    process.exitCode = 2;
+    return;
+  }
   const scope = resolveScope({ scope: flags.scope, base: flags.base, cwd });
   if (scope.error) {
     out(`Cannot review: ${scope.error}`);
