@@ -52,6 +52,17 @@ test("working-tree: untracked filename with a trailing space is read correctly",
   assert.match(r.text, /spacey-content/);
 });
 
+test("working-tree: untracked filename is rendered escaped in the heading", { skip: process.platform === "win32" ? "double-quote filenames are not valid on Windows" : false }, () => {
+  const dir = tempRepo();
+  write(dir, "a.txt", "x\n");
+  git(dir, "add", "a.txt");
+  git(dir, "commit", "-q", "-m", "init");
+  write(dir, 'has"quote.txt', "qcontent\n"); // a name needing JSON escaping
+  const r = resolveScope({ scope: "working-tree", cwd: dir });
+  assert.match(r.text, /qcontent/);
+  assert.match(r.text, /New file: "has/); // JSON.stringify-quoted heading
+});
+
 test("working-tree: no-HEAD repo with staged file", () => {
   const dir = tempRepo();
   write(dir, "first.txt", "content\n");

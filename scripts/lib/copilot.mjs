@@ -38,7 +38,19 @@ export function buildReviewArgs({ prompt, model = null }) {
   return args;
 }
 
+// Conservative single-argument size limits: Windows command lines cap near
+// 32 KB; POSIX ARG_MAX is far larger but shared with the environment.
+const MAX_PROMPT_BYTES = process.platform === "win32" ? 30000 : 1000000;
+
 export function runReview({ cwd, prompt, model = null, copilotBin = "copilot" }) {
+  const promptBytes = Buffer.byteLength(prompt, "utf8");
+  if (promptBytes > MAX_PROMPT_BYTES) {
+    return {
+      ok: false,
+      detail: `Review prompt is too large (${promptBytes} bytes) to pass to ${copilotBin} as a command-line argument on this platform (limit ~${MAX_PROMPT_BYTES}). Review fewer files or use a narrower --scope.`,
+      output: ""
+    };
+  }
   const args = buildReviewArgs({ prompt, model });
   const res = run(copilotBin, args, { cwd });
   if (res.error) {

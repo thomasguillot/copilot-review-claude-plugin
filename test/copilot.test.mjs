@@ -59,6 +59,13 @@ test("runReview reports failure when binary missing", () => {
   assert.match(r.detail, /Could not run/);
 });
 
+test("runReview rejects an oversized prompt instead of failing to spawn", () => {
+  const big = "x".repeat(1_100_000); // exceeds the conservative argv limit on all platforms
+  const r = runReview({ cwd: process.cwd(), prompt: big, copilotBin: STUB });
+  assert.equal(r.ok, false);
+  assert.match(r.detail, /too large/i);
+});
+
 test("probeAuth succeeds against stub READY reply", () => {
   const r = probeAuth({ cwd: process.cwd(), copilotBin: STUB });
   assert.equal(r.ok, true);

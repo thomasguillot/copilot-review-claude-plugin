@@ -62,7 +62,10 @@ function untrackedSegments(cwd, files) {
     // Use a fence longer than any backtick run in the body so file content
     // containing ``` cannot prematurely terminate the code fence.
     const fence = "`".repeat(Math.max(3, longestBacktickRun(body) + 1));
-    return { path: rel, text: `### New file: ${rel}\n${fence}\n${body}\n${fence}\n` };
+    // Render the path via JSON.stringify in the heading so newlines/control
+    // characters in a crafted filename can't break the markdown or shape the
+    // prompt; the raw `rel` is still used for file I/O above.
+    return { path: rel, text: `### New file: ${JSON.stringify(rel)}\n${fence}\n${body}\n${fence}\n` };
   });
 }
 
