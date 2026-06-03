@@ -25,6 +25,12 @@ test("binaryAvailable false for missing binary", () => {
   assert.equal(res.available, false);
 });
 
+test("binaryAvailable strips CR from CRLF version output", () => {
+  const res = binaryAvailable("node", ["-e", "process.stdout.write('v1.2.3\\r\\nextra\\r\\n')"]);
+  assert.equal(res.available, true);
+  assert.equal(res.detail, "v1.2.3");
+});
+
 test("run captures non-zero exit code", () => {
   const res = run("node", ["-e", "process.exit(42)"]);
   assert.equal(res.code, 42);

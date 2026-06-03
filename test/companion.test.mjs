@@ -114,6 +114,13 @@ test("review with an invalid --scope value fails fast", () => {
   assert.match(r.stdout, /Invalid --scope/);
 });
 
+test("review rejects an unknown flag", () => {
+  const dir = tempRepo();
+  const r = companion(["review", "--scpoe", "branch"], dir);
+  assert.equal(r.code, 2);
+  assert.match(r.stdout, /Unknown option/);
+});
+
 test("review outside a git repository errors instead of reporting clean", () => {
   const dir = mkdtempSync(join(tmpdir(), "nogit-"));
   const r = companion(["review"], dir);

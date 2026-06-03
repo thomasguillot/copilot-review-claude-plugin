@@ -26,5 +26,6 @@ export function binaryAvailable(cmd, args = ["--version"], opts = {}) {
     const how = res.signal ? `terminated by signal ${res.signal}` : `exited ${res.code}`;
     return { available: false, detail: `${cmd} ${how}: ${(res.stderr || res.stdout).trim()}` };
   }
-  return { available: true, detail: (res.stdout || res.stderr).trim().split("\n")[0] };
+  // Strip CR first so CRLF output doesn't leave a trailing \r on the first line.
+  return { available: true, detail: (res.stdout || res.stderr).replace(/\r/g, "").trim().split("\n")[0] };
 }

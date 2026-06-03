@@ -45,6 +45,10 @@ function parseFlags(rest) {
       if (name === "--scope") flags.scope = value;
       else if (name === "--base") flags.base = value;
       else if (name === "--model") flags.model = value;
+    } else {
+      // Anything else (e.g. a typo'd flag like --scpoe) is rejected rather than
+      // silently ignored, so misconfigured reviews fail loudly.
+      flags.error = `Unknown option '${tokens[i]}'.`;
     }
   }
   return flags;
