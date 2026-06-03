@@ -58,6 +58,12 @@ A small Node script computes the diff for the chosen scope and passes it to
 Copilot cannot modify files or run commands while it reviews. It reasons over
 the assembled diff and its findings are returned verbatim.
 
+## For AI agents
+
+Agent-oriented install and usage instructions live in [`AGENTS.md`](AGENTS.md),
+including a non-interactive `settings.json` install path. `CLAUDE.md` imports it
+(`@AGENTS.md`) so Claude Code picks it up automatically.
+
 ## Development
 
 ```
