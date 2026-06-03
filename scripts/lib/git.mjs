@@ -2,13 +2,20 @@ import { readFileSync, lstatSync, readlinkSync } from "node:fs";
 import { join } from "node:path";
 import { run } from "./process.mjs";
 
+const MAX_UNTRACKED_BYTES = 64 * 1024;
+
 function hasHead(cwd) {
   return run("git", ["rev-parse", "--verify", "--quiet", "HEAD"], { cwd }).code === 0;
 }
 
 function detectBase(cwd) {
+  const head = run("git", ["rev-parse", "--verify", "--quiet", "HEAD"], { cwd }).stdout.trim();
   for (const ref of ["main", "master", "origin/main", "origin/master", "origin/HEAD"]) {
-    if (run("git", ["rev-parse", "--verify", "--quiet", ref], { cwd }).code === 0) {
+    const r = run("git", ["rev-parse", "--verify", "--quiet", ref], { cwd });
+    // Skip a candidate that points at the same commit as HEAD (e.g. running
+    // --scope branch while checked out on main itself) — it would yield an
+    // empty, falsely-clean diff.
+    if (r.code === 0 && r.stdout.trim() !== head) {
       return ref;
     }
   }
@@ -37,7 +44,12 @@ function untrackedSegments(cwd) {
       if (st.isSymbolicLink()) {
         body = `Symlink → ${readlinkSync(abs)}`;
       } else if (st.isFile()) {
-        body = readFileSync(abs, "utf8");
+        if (st.size > MAX_UNTRACKED_BYTES) {
+          body = `<untracked file too large to inline: ${st.size} bytes>`;
+        } else {
+          const buf = readFileSync(abs);
+          body = buf.includes(0) ? "<binary file omitted>" : buf.toString("utf8");
+        }
       } else {
         body = "<non-regular file>";
       }
