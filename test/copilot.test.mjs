@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { writeFileSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { buildReviewPrompt, getAuthStatus, cleanCopilotOutput } from "../scripts/lib/copilot.mjs";
+import { buildReviewPrompt, getAuthStatus, cleanCopilotOutput, buildReviewArgs } from "../scripts/lib/copilot.mjs";
 import { runReview, probeAuth } from "../scripts/lib/copilot.mjs";
 import { fileURLToPath } from "node:url";
 import { dirname, join as pjoin } from "node:path";
@@ -56,4 +56,18 @@ test("runReview reports failure when binary missing", () => {
 test("probeAuth succeeds against stub READY reply", () => {
   const r = probeAuth({ cwd: process.cwd(), copilotBin: STUB });
   assert.equal(r.ok, true);
+});
+
+test("buildReviewArgs denies write and shell tools (review-only)", () => {
+  const args = buildReviewArgs({ prompt: "p" });
+  assert.ok(args.includes("--no-color"));
+  assert.ok(args.includes("--deny-tool"));
+  assert.ok(args.includes("write"));
+  assert.ok(args.includes("shell"));
+});
+
+test("buildReviewArgs appends model when provided", () => {
+  const args = buildReviewArgs({ prompt: "p", model: "gpt-x" });
+  assert.ok(args.includes("--model"));
+  assert.ok(args.includes("gpt-x"));
 });

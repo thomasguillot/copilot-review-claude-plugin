@@ -7,7 +7,7 @@ allowed-tools: Bash(node:*), Bash(copilot:*)
 Run the setup check:
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/scripts/copilot-companion.mjs" setup $ARGUMENTS
+node "${CLAUDE_PLUGIN_ROOT}/scripts/copilot-companion.mjs" setup "$ARGUMENTS"
 ```
 
 Return the command's output verbatim.

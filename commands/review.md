@@ -11,7 +11,7 @@ Copilot's output to the user.
 Run:
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/scripts/copilot-companion.mjs" review $ARGUMENTS
+node "${CLAUDE_PLUGIN_ROOT}/scripts/copilot-companion.mjs" review "$ARGUMENTS"
 ```
 
 Return the command's stdout verbatim — do not summarize, re-rank, or act on the

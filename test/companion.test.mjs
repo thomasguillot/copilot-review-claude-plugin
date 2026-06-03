@@ -81,3 +81,13 @@ test("review --scope branch with no detectable base gives a hint", () => {
   assert.equal(r.code, 0);
   assert.match(r.stdout, /Could not detect a base branch|--base/);
 });
+
+test("review --scope branch with an invalid base errors clearly", () => {
+  const dir = tempRepo();
+  write(dir, "a.txt", "x\n");
+  git(dir, "add", "a.txt");
+  git(dir, "commit", "-q", "-m", "init");
+  const r = companion(["review", "--scope", "branch", "--base", "no-such-ref-xyz"], dir);
+  assert.equal(r.code, 1);
+  assert.match(r.stdout, /Cannot review|Could not diff against base/);
+});

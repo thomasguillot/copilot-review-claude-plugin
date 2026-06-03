@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, lstatSync, readlinkSync } from "node:fs";
 import { join } from "node:path";
 import { run } from "./process.mjs";
 
@@ -30,13 +30,21 @@ function untrackedSegments(cwd) {
   const res = run("git", ["ls-files", "--others", "--exclude-standard"], { cwd });
   const files = res.stdout.split("\n").map((s) => s.trim()).filter(Boolean);
   return files.map((rel) => {
-    let content;
+    const abs = join(cwd, rel);
+    let body;
     try {
-      content = readFileSync(join(cwd, rel), "utf8");
+      const st = lstatSync(abs);
+      if (st.isSymbolicLink()) {
+        body = `Symlink → ${readlinkSync(abs)}`;
+      } else if (st.isFile()) {
+        body = readFileSync(abs, "utf8");
+      } else {
+        body = "<non-regular file>";
+      }
     } catch {
-      content = "<unreadable>";
+      body = "<unreadable>";
     }
-    return { path: rel, text: `### New file: ${rel}\n\`\`\`\n${content}\n\`\`\`\n` };
+    return { path: rel, text: `### New file: ${rel}\n\`\`\`\n${body}\n\`\`\`\n` };
   });
 }
 
@@ -45,8 +53,16 @@ function assembleSegments(segments, maxBytes) {
   const droppedFiles = [];
   let truncated = false;
   for (const seg of segments) {
-    if (!truncated && text.length + seg.text.length <= maxBytes) {
+    if (truncated) {
+      droppedFiles.push(seg.path);
+    } else if (text.length + seg.text.length <= maxBytes) {
       text += seg.text + "\n";
+    } else if (text.length === 0) {
+      // First segment alone exceeds the cap: include a truncated slice so the
+      // review is never silently skipped.
+      text += seg.text.slice(0, maxBytes) + "\n[... diff truncated ...]\n";
+      truncated = true;
+      droppedFiles.push(seg.path);
     } else {
       truncated = true;
       droppedFiles.push(seg.path);
@@ -64,6 +80,17 @@ export function resolveScope({ scope = "working-tree", base = null, cwd = proces
     const baseNote = !base && ref === "HEAD" ? " — no base branch detected" : "";
     scopeLabel = `branch diff (${ref}...HEAD)${baseNote}`;
     const d = run("git", ["diff", `${ref}...HEAD`], { cwd });
+    if (d.code !== 0) {
+      return {
+        text: "",
+        fileCount: 0,
+        truncated: false,
+        droppedFiles: [],
+        isEmpty: true,
+        scopeLabel,
+        error: `Could not diff against base '${ref}': ${(d.stderr || "").trim() || "git diff failed"}`
+      };
+    }
     segments = splitDiffSegments(d.stdout);
   } else {
     scopeLabel = "working tree (uncommitted changes)";
@@ -80,6 +107,7 @@ export function resolveScope({ scope = "working-tree", base = null, cwd = proces
     truncated,
     droppedFiles,
     isEmpty: text.trim().length === 0,
-    scopeLabel
+    scopeLabel,
+    error: null
   };
 }
