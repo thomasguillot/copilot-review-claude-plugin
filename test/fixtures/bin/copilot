@@ -13,6 +13,14 @@ if [[ "$args" == *"READY"* ]]; then
   exit 0
 fi
 
+if [[ "$args" == *"BIGOUTPUT"* ]]; then
+  # Emit ~140 KB to exercise stdout draining on process exit.
+  for i in $(seq 1 2000); do
+    echo "LINE $i ----------------------------------------------------------------"
+  done
+  exit 0
+fi
+
 cat <<'EOF'
 ## Summary
 One potential issue found in the diff.
