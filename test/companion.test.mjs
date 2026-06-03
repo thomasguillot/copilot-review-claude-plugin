@@ -69,3 +69,15 @@ test("review streams large output without truncation", () => {
   assert.ok(r.stdout.length > 64 * 1024, `expected >64KB of stdout, got ${r.stdout.length}`);
   assert.match(r.stdout, /LINE 2000/); // last line present => nothing truncated
 });
+
+test("review --scope branch with no detectable base gives a hint", () => {
+  const dir = tempRepo();
+  // Move to a branch name that won't be auto-detected, with no main/master/remote.
+  git(dir, "symbolic-ref", "HEAD", "refs/heads/develop");
+  write(dir, "a.txt", "x\n");
+  git(dir, "add", "a.txt");
+  git(dir, "commit", "-q", "-m", "init");
+  const r = companion(["review", "--scope", "branch"], dir);
+  assert.equal(r.code, 0);
+  assert.match(r.stdout, /Could not detect a base branch|--base/);
+});
