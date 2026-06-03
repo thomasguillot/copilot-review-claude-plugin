@@ -100,7 +100,7 @@ function cmdReview(flags, cwd) {
   const result = runReview({ cwd, prompt, model: flags.model });
 
   if (scope.truncated) {
-    out(`> Note: the diff was large and was truncated. Files omitted from this review: ${scope.droppedFiles.join(", ")}`);
+    out(`> Note: the diff was large and was truncated. Files omitted or only partially included: ${scope.droppedFiles.join(", ")}`);
     out("");
   }
 

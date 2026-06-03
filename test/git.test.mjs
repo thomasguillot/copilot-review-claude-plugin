@@ -49,6 +49,17 @@ test("working-tree: no-HEAD repo with staged file", () => {
   assert.match(r.text, /first\.txt/);
 });
 
+test("working-tree: no-HEAD repo captures staged + later unstaged edits", () => {
+  const dir = tempRepo();
+  write(dir, "f.txt", "line1\n");
+  git(dir, "add", "f.txt");
+  write(dir, "f.txt", "line1\nline2-unstaged\n"); // modify after staging, before any commit
+  const r = resolveScope({ scope: "working-tree", cwd: dir });
+  assert.equal(r.isEmpty, false);
+  assert.match(r.text, /line1/);
+  assert.match(r.text, /line2-unstaged/);
+});
+
 test("working-tree: clean repo is empty", () => {
   const dir = tempRepo();
   write(dir, "a.txt", "x\n");

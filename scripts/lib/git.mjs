@@ -104,9 +104,16 @@ export function resolveScope({ scope = "working-tree", base = null, cwd = proces
     segments = splitDiffSegments(d.stdout);
   } else {
     scopeLabel = "working tree (uncommitted changes)";
-    const trackedRes = hasHead(cwd)
-      ? run("git", ["diff", "--no-ext-diff", "--no-textconv", "HEAD"], { cwd })
-      : run("git", ["diff", "--no-ext-diff", "--no-textconv", "--cached"], { cwd });
+    let trackedRes;
+    if (hasHead(cwd)) {
+      trackedRes = run("git", ["diff", "--no-ext-diff", "--no-textconv", "HEAD"], { cwd });
+    } else {
+      // No commits yet: diff the working tree against the empty tree so BOTH
+      // staged and later-unstaged edits to tracked files are captured
+      // (`--cached` alone would miss unstaged changes to already-staged files).
+      const emptyTree = run("git", ["hash-object", "-t", "tree", "/dev/null"], { cwd }).stdout.trim();
+      trackedRes = run("git", ["diff", "--no-ext-diff", "--no-textconv", emptyTree], { cwd });
+    }
     if (trackedRes.code !== 0) {
       return {
         text: "",
