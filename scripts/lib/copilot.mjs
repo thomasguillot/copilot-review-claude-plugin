@@ -29,3 +29,31 @@ export function getAuthStatus({ env = process.env, skipGh = false } = {}) {
 export function cleanCopilotOutput(stdout) {
   return String(stdout ?? "").replace(/\r\n/g, "\n").trim();
 }
+
+export function runReview({ cwd, prompt, model = null, copilotBin = "copilot" }) {
+  const args = ["-p", prompt, "--no-color"];
+  if (model) args.push("--model", model);
+  const res = run(copilotBin, args, { cwd });
+  if (res.error) {
+    return { ok: false, detail: `Could not run ${copilotBin}: ${res.error.code ?? res.error.message}`, output: "" };
+  }
+  if (res.code !== 0) {
+    return {
+      ok: false,
+      detail: (res.stderr || "").trim() || `${copilotBin} exited ${res.code}`,
+      output: cleanCopilotOutput(res.stdout)
+    };
+  }
+  return { ok: true, detail: null, output: cleanCopilotOutput(res.stdout) };
+}
+
+export function probeAuth({ cwd, copilotBin = "copilot" }) {
+  const res = run(copilotBin, ["-p", "Reply with exactly: READY", "--no-color"], { cwd });
+  if (res.error) {
+    return { ok: false, detail: `Could not run ${copilotBin}: ${res.error.code ?? res.error.message}` };
+  }
+  if (res.code === 0 && String(res.stdout).toUpperCase().includes("READY")) {
+    return { ok: true, detail: "Auth verified — Copilot responded." };
+  }
+  return { ok: false, detail: (res.stderr || res.stdout || `${copilotBin} exited ${res.code}`).trim() };
+}
