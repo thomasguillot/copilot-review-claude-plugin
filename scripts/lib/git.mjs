@@ -66,10 +66,12 @@ function untrackedSegments(cwd, files) {
   });
 }
 
+const TRUNCATION_MARKER = "\n[... diff truncated ...]\n";
+
 function sliceBytes(s, maxBytes) {
   const buf = Buffer.from(s, "utf8");
   if (buf.length <= maxBytes) return s;
-  let end = maxBytes;
+  let end = Math.max(0, maxBytes);
   // Back off so we never cut in the middle of a UTF-8 multibyte sequence.
   while (end > 0 && (buf[end] & 0xc0) === 0x80) end--;
   return buf.toString("utf8", 0, end);
@@ -84,13 +86,17 @@ function assembleSegments(segments, maxBytes) {
     const segBytes = Buffer.byteLength(seg.text, "utf8");
     if (truncated) {
       droppedFiles.push(seg.path);
-    } else if (bytes + segBytes <= maxBytes) {
+    } else if (bytes + segBytes + 1 <= maxBytes) {
+      // +1 accounts for the newline appended after each segment, so the
+      // assembled output never exceeds maxBytes.
       text += seg.text + "\n";
       bytes += segBytes + 1;
     } else if (bytes === 0) {
-      // First segment alone exceeds the cap: include a truncated slice so the
-      // review is never silently skipped.
-      text += sliceBytes(seg.text, maxBytes) + "\n[... diff truncated ...]\n";
+      // First segment alone exceeds the cap: include a truncated slice, leaving
+      // room for the marker, so the review is never silently skipped and the
+      // output still stays within maxBytes.
+      const room = Math.max(0, maxBytes - Buffer.byteLength(TRUNCATION_MARKER, "utf8"));
+      text += sliceBytes(seg.text, room) + TRUNCATION_MARKER;
       truncated = true;
       droppedFiles.push(seg.path);
     } else {

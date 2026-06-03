@@ -83,6 +83,36 @@ test("size cap counts bytes, not characters, for multibyte content", () => {
   assert.equal(r.truncated, true);
 });
 
+test("size cap: assembled output never exceeds maxBytes", () => {
+  const dir = tempRepo();
+  write(dir, "seed.txt", "x\n");
+  git(dir, "add", "seed.txt");
+  git(dir, "commit", "-q", "-m", "init");
+  for (let i = 0; i < 10; i++) write(dir, `f${i}.txt`, "y\n".repeat(1000)); // ~2 KB each
+  const cap = 5000;
+  const r = resolveScope({ scope: "working-tree", cwd: dir, maxBytes: cap });
+  assert.equal(r.truncated, true);
+  assert.ok(
+    Buffer.byteLength(r.text, "utf8") <= cap,
+    `assembled ${Buffer.byteLength(r.text, "utf8")} bytes exceeds cap ${cap}`
+  );
+});
+
+test("size cap: truncated single oversized file stays within maxBytes", () => {
+  const dir = tempRepo();
+  write(dir, "seed.txt", "x\n");
+  git(dir, "add", "seed.txt");
+  git(dir, "commit", "-q", "-m", "init");
+  write(dir, "huge.txt", "z\n".repeat(20000)); // ~40 KB single file
+  const cap = 10000;
+  const r = resolveScope({ scope: "working-tree", cwd: dir, maxBytes: cap });
+  assert.equal(r.truncated, true);
+  assert.ok(
+    Buffer.byteLength(r.text, "utf8") <= cap,
+    `assembled ${Buffer.byteLength(r.text, "utf8")} bytes exceeds cap ${cap}`
+  );
+});
+
 test("working-tree: clean repo is empty", () => {
   const dir = tempRepo();
   write(dir, "a.txt", "x\n");
