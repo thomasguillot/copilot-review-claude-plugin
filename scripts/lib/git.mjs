@@ -112,6 +112,17 @@ export function resolveScope({ scope = "working-tree", base = null, cwd = proces
   let scopeLabel;
 
   if (scope === "branch") {
+    if (!hasHead(cwd)) {
+      return {
+        text: "",
+        fileCount: 0,
+        truncated: false,
+        droppedFiles: [],
+        isEmpty: true,
+        scopeLabel: "branch diff",
+        error: "No commits yet (unborn HEAD); use --scope working-tree until the first commit exists."
+      };
+    }
     const ref = base || detectBase(cwd);
     const baseNote = !base && ref === "HEAD" ? " — no base branch detected" : "";
     scopeLabel = `branch diff (${ref}...HEAD)${baseNote}`;

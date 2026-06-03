@@ -40,7 +40,7 @@ test("working-tree: untracked file content appears", () => {
   assert.match(r.text, /hello-untracked/);
 });
 
-test("working-tree: untracked filename with a trailing space is read correctly", () => {
+test("working-tree: untracked filename with a trailing space is read correctly", { skip: process.platform === "win32" ? "trailing-space filenames are not representable on Windows" : false }, () => {
   const dir = tempRepo();
   write(dir, "a.txt", "x\n");
   git(dir, "add", "a.txt");
@@ -123,6 +123,13 @@ test("size cap: truncated single oversized file stays within maxBytes", () => {
     Buffer.byteLength(r.text, "utf8") <= cap,
     `assembled ${Buffer.byteLength(r.text, "utf8")} bytes exceeds cap ${cap}`
   );
+});
+
+test("branch scope on a no-HEAD repo errors with guidance", () => {
+  const dir = tempRepo(); // no commits yet (unborn HEAD)
+  const r = resolveScope({ scope: "branch", cwd: dir });
+  assert.equal(r.isEmpty, true);
+  assert.match(r.error, /no commits|working-tree/i);
 });
 
 test("working-tree: clean repo is empty", () => {

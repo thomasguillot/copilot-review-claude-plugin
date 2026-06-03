@@ -44,10 +44,11 @@ export function runReview({ cwd, prompt, model = null, copilotBin = "copilot" })
   if (res.error) {
     return { ok: false, detail: `Could not run ${copilotBin}: ${res.error.code ?? res.error.message}`, output: "" };
   }
-  if (res.code !== 0) {
+  if (res.code !== 0 || res.signal) {
+    const how = res.signal ? `terminated by signal ${res.signal}` : `exited ${res.code}`;
     return {
       ok: false,
-      detail: (res.stderr || "").trim() || `${copilotBin} exited ${res.code}`,
+      detail: (res.stderr || "").trim() || `${copilotBin} ${how}`,
       output: cleanCopilotOutput(res.stdout)
     };
   }
@@ -68,5 +69,6 @@ export function probeAuth({ cwd, copilotBin = "copilot" }) {
   if (res.code === 0 && probeSaysReady(res.stdout)) {
     return { ok: true, detail: "Auth verified — Copilot responded." };
   }
-  return { ok: false, detail: (res.stderr || res.stdout || `${copilotBin} exited ${res.code}`).trim() };
+  const how = res.signal ? `terminated by signal ${res.signal}` : `exited ${res.code}`;
+  return { ok: false, detail: (res.stderr || res.stdout || `${copilotBin} ${how}`).trim() };
 }
