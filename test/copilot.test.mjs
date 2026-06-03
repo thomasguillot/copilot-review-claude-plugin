@@ -2,13 +2,18 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { writeFileSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { buildReviewPrompt, getAuthStatus, cleanCopilotOutput, buildReviewArgs } from "../scripts/lib/copilot.mjs";
-import { runReview, probeAuth } from "../scripts/lib/copilot.mjs";
+import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { dirname, join as pjoin } from "node:path";
+import {
+  buildReviewPrompt,
+  getAuthStatus,
+  cleanCopilotOutput,
+  buildReviewArgs,
+  runReview,
+  probeAuth
+} from "../scripts/lib/copilot.mjs";
 
-const STUB = pjoin(dirname(fileURLToPath(import.meta.url)), "fixtures", "bin", "copilot");
+const STUB = join(dirname(fileURLToPath(import.meta.url)), "fixtures", "bin", "copilot");
 
 function tmpTemplate(content) {
   const p = join(mkdtempSync(join(tmpdir(), "tmpl-")), "review.md");

@@ -4,6 +4,11 @@ import { run } from "./process.mjs";
 
 const MAX_UNTRACKED_BYTES = 64 * 1024;
 
+function longestBacktickRun(s) {
+  const runs = String(s).match(/`+/g);
+  return runs ? Math.max(...runs.map((r) => r.length)) : 0;
+}
+
 function hasHead(cwd) {
   return run("git", ["rev-parse", "--verify", "--quiet", "HEAD"], { cwd }).code === 0;
 }
@@ -54,7 +59,10 @@ function untrackedSegments(cwd, files) {
     } catch {
       body = "<unreadable>";
     }
-    return { path: rel, text: `### New file: ${rel}\n\`\`\`\n${body}\n\`\`\`\n` };
+    // Use a fence longer than any backtick run in the body so file content
+    // containing ``` cannot prematurely terminate the code fence.
+    const fence = "`".repeat(Math.max(3, longestBacktickRun(body) + 1));
+    return { path: rel, text: `### New file: ${rel}\n${fence}\n${body}\n${fence}\n` };
   });
 }
 

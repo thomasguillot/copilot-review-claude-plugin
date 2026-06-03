@@ -107,3 +107,15 @@ test("review outside a git repository errors instead of reporting clean", () => 
   assert.equal(r.code, 1);
   assert.match(r.stdout, /Cannot review|git diff failed|not a git/i);
 });
+
+test("review strips surrounding quotes from a flag value", () => {
+  const dir = tempRepo();
+  write(dir, "a.txt", "x\n");
+  git(dir, "add", "a.txt");
+  git(dir, "commit", "-q", "-m", "init");
+  // Quoted base ref: quotes must be stripped so the error names the bare ref.
+  const r = companion(["review", "--scope", "branch", "--base", '"no-such-ref-xyz"'], dir);
+  assert.equal(r.code, 1);
+  assert.match(r.stdout, /no-such-ref-xyz/);
+  assert.doesNotMatch(r.stdout, /"no-such-ref-xyz"/); // quotes were stripped
+});

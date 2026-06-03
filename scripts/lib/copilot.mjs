@@ -55,7 +55,7 @@ export function runReview({ cwd, prompt, model = null, copilotBin = "copilot" })
 }
 
 export function probeAuth({ cwd, copilotBin = "copilot" }) {
-  const res = run(copilotBin, ["-p", "Reply with exactly: READY", "--no-color"], { cwd });
+  const res = run(copilotBin, ["-p", "Reply with exactly: READY", "--no-color", "--deny-tool", "write", "--deny-tool", "shell"], { cwd });
   if (res.error) {
     return { ok: false, detail: `Could not run ${copilotBin}: ${res.error.code ?? res.error.message}` };
   }

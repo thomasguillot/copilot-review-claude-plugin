@@ -33,6 +33,15 @@ function parseFlags(rest) {
         flags.error = `${name} requires a value`;
         continue;
       }
+      // Strip a single layer of surrounding quotes (e.g. --base "main"), since
+      // $ARGUMENTS arrives as one already-quoted string and is split on spaces.
+      if (
+        value.length >= 2 &&
+        ((value[0] === '"' && value[value.length - 1] === '"') ||
+          (value[0] === "'" && value[value.length - 1] === "'"))
+      ) {
+        value = value.slice(1, -1);
+      }
       if (name === "--scope") flags.scope = value;
       else if (name === "--base") flags.base = value;
       else if (name === "--model") flags.model = value;

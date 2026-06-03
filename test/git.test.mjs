@@ -60,6 +60,18 @@ test("working-tree: no-HEAD repo captures staged + later unstaged edits", () => 
   assert.match(r.text, /line2-unstaged/);
 });
 
+test("working-tree: untracked file containing backticks gets a longer fence", () => {
+  const dir = tempRepo();
+  write(dir, "a.txt", "x\n");
+  git(dir, "add", "a.txt");
+  git(dir, "commit", "-q", "-m", "init");
+  write(dir, "snippet.md", "```js\ncode-here\n```\n"); // content has triple backticks
+  const r = resolveScope({ scope: "working-tree", cwd: dir });
+  assert.match(r.text, /snippet\.md/);
+  assert.match(r.text, /code-here/);
+  assert.match(r.text, /````/); // fence is 4+ backticks so the inner ``` can't close it
+});
+
 test("working-tree: clean repo is empty", () => {
   const dir = tempRepo();
   write(dir, "a.txt", "x\n");
