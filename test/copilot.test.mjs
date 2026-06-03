@@ -10,7 +10,8 @@ import {
   cleanCopilotOutput,
   buildReviewArgs,
   runReview,
-  probeAuth
+  probeAuth,
+  probeSaysReady
 } from "../scripts/lib/copilot.mjs";
 
 const STUB = join(dirname(fileURLToPath(import.meta.url)), "fixtures", "bin", "copilot");
@@ -61,6 +62,13 @@ test("runReview reports failure when binary missing", () => {
 test("probeAuth succeeds against stub READY reply", () => {
   const r = probeAuth({ cwd: process.cwd(), copilotBin: STUB });
   assert.equal(r.ok, true);
+});
+
+test("probeSaysReady accepts a standalone READY, rejects NOT READY", () => {
+  assert.equal(probeSaysReady("READY"), true);
+  assert.equal(probeSaysReady("ok\nREADY\n"), true);
+  assert.equal(probeSaysReady("NOT READY"), false);
+  assert.equal(probeSaysReady("already done"), false);
 });
 
 test("buildReviewArgs denies write and shell tools (review-only)", () => {

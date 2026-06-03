@@ -1,7 +1,7 @@
 ---
 description: Check the GitHub Copilot CLI is installed and authenticated (no secrets stored)
 argument-hint: '[--probe]'
-allowed-tools: Bash(node:*), Bash(copilot:*)
+allowed-tools: Bash(node:*)
 ---
 
 Run the setup check:

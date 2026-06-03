@@ -66,19 +66,31 @@ function untrackedSegments(cwd, files) {
   });
 }
 
+function sliceBytes(s, maxBytes) {
+  const buf = Buffer.from(s, "utf8");
+  if (buf.length <= maxBytes) return s;
+  let end = maxBytes;
+  // Back off so we never cut in the middle of a UTF-8 multibyte sequence.
+  while (end > 0 && (buf[end] & 0xc0) === 0x80) end--;
+  return buf.toString("utf8", 0, end);
+}
+
 function assembleSegments(segments, maxBytes) {
   let text = "";
+  let bytes = 0;
   const droppedFiles = [];
   let truncated = false;
   for (const seg of segments) {
+    const segBytes = Buffer.byteLength(seg.text, "utf8");
     if (truncated) {
       droppedFiles.push(seg.path);
-    } else if (text.length + seg.text.length <= maxBytes) {
+    } else if (bytes + segBytes <= maxBytes) {
       text += seg.text + "\n";
-    } else if (text.length === 0) {
+      bytes += segBytes + 1;
+    } else if (bytes === 0) {
       // First segment alone exceeds the cap: include a truncated slice so the
       // review is never silently skipped.
-      text += seg.text.slice(0, maxBytes) + "\n[... diff truncated ...]\n";
+      text += sliceBytes(seg.text, maxBytes) + "\n[... diff truncated ...]\n";
       truncated = true;
       droppedFiles.push(seg.path);
     } else {

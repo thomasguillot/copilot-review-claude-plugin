@@ -1,7 +1,7 @@
 ---
 description: Ask GitHub Copilot to review your current git changes
 argument-hint: '[--scope working-tree|branch] [--base <ref>] [--model <model>]'
-allowed-tools: Bash(node:*), Bash(git:*)
+allowed-tools: Bash(node:*)
 ---
 
 This command is **review-only**. Do not fix issues, apply patches, or edit any

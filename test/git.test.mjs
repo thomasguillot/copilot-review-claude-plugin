@@ -72,6 +72,17 @@ test("working-tree: untracked file containing backticks gets a longer fence", ()
   assert.match(r.text, /````/); // fence is 4+ backticks so the inner ``` can't close it
 });
 
+test("size cap counts bytes, not characters, for multibyte content", () => {
+  const dir = tempRepo();
+  write(dir, "seed.txt", "x\n");
+  git(dir, "add", "seed.txt");
+  git(dir, "commit", "-q", "-m", "init");
+  write(dir, "multi.txt", "é".repeat(5000)); // 5000 chars but ~10000 bytes (2 bytes each)
+  const r = resolveScope({ scope: "working-tree", cwd: dir, maxBytes: 7000 });
+  // Under character counting (~5000) this would NOT truncate; by bytes (~10000) it must.
+  assert.equal(r.truncated, true);
+});
+
 test("working-tree: clean repo is empty", () => {
   const dir = tempRepo();
   write(dir, "a.txt", "x\n");

@@ -54,12 +54,18 @@ export function runReview({ cwd, prompt, model = null, copilotBin = "copilot" })
   return { ok: true, detail: null, output: cleanCopilotOutput(res.stdout) };
 }
 
+export function probeSaysReady(stdout) {
+  // Require READY as a standalone token on its own line, so "NOT READY" or a
+  // sentence merely containing the word does not count as success.
+  return /(^|\n)\s*READY\s*(\n|$)/i.test(String(stdout ?? ""));
+}
+
 export function probeAuth({ cwd, copilotBin = "copilot" }) {
   const res = run(copilotBin, ["-p", "Reply with exactly: READY", "--no-color", "--deny-tool", "write", "--deny-tool", "shell"], { cwd });
   if (res.error) {
     return { ok: false, detail: `Could not run ${copilotBin}: ${res.error.code ?? res.error.message}` };
   }
-  if (res.code === 0 && String(res.stdout).toUpperCase().includes("READY")) {
+  if (res.code === 0 && probeSaysReady(res.stdout)) {
     return { ok: true, detail: "Auth verified — Copilot responded." };
   }
   return { ok: false, detail: (res.stderr || res.stdout || `${copilotBin} exited ${res.code}`).trim() };
