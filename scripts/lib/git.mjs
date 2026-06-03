@@ -33,9 +33,7 @@ function splitDiffSegments(diffText) {
   });
 }
 
-function untrackedSegments(cwd) {
-  const res = run("git", ["ls-files", "--others", "--exclude-standard"], { cwd });
-  const files = res.stdout.split("\n").map((s) => s.trim()).filter(Boolean);
+function untrackedSegments(cwd, files) {
   return files.map((rel) => {
     const abs = join(cwd, rel);
     let body;
@@ -91,7 +89,7 @@ export function resolveScope({ scope = "working-tree", base = null, cwd = proces
     const ref = base || detectBase(cwd);
     const baseNote = !base && ref === "HEAD" ? " — no base branch detected" : "";
     scopeLabel = `branch diff (${ref}...HEAD)${baseNote}`;
-    const d = run("git", ["diff", `${ref}...HEAD`], { cwd });
+    const d = run("git", ["diff", "--no-ext-diff", "--no-textconv", `${ref}...HEAD`], { cwd });
     if (d.code !== 0) {
       return {
         text: "",
@@ -106,10 +104,34 @@ export function resolveScope({ scope = "working-tree", base = null, cwd = proces
     segments = splitDiffSegments(d.stdout);
   } else {
     scopeLabel = "working tree (uncommitted changes)";
-    const trackedDiff = hasHead(cwd)
-      ? run("git", ["diff", "HEAD"], { cwd }).stdout
-      : run("git", ["diff", "--cached"], { cwd }).stdout;
-    segments = [...splitDiffSegments(trackedDiff), ...untrackedSegments(cwd)];
+    const trackedRes = hasHead(cwd)
+      ? run("git", ["diff", "--no-ext-diff", "--no-textconv", "HEAD"], { cwd })
+      : run("git", ["diff", "--no-ext-diff", "--no-textconv", "--cached"], { cwd });
+    if (trackedRes.code !== 0) {
+      return {
+        text: "",
+        fileCount: 0,
+        truncated: false,
+        droppedFiles: [],
+        isEmpty: true,
+        scopeLabel,
+        error: `git diff failed: ${(trackedRes.stderr || "").trim() || "not a git repository?"}`
+      };
+    }
+    const lsRes = run("git", ["ls-files", "--others", "--exclude-standard"], { cwd });
+    if (lsRes.code !== 0) {
+      return {
+        text: "",
+        fileCount: 0,
+        truncated: false,
+        droppedFiles: [],
+        isEmpty: true,
+        scopeLabel,
+        error: `git ls-files failed: ${(lsRes.stderr || "").trim() || "not a git repository?"}`
+      };
+    }
+    const untracked = lsRes.stdout.split("\n").map((s) => s.trim()).filter(Boolean);
+    segments = [...splitDiffSegments(trackedRes.stdout), ...untrackedSegments(cwd, untracked)];
   }
 
   const { text, truncated, droppedFiles } = assembleSegments(segments, maxBytes);

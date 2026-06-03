@@ -54,8 +54,9 @@ Want a review loop? Just tell Claude: "fix the High findings and run
 ## How it works
 
 A small Node script computes the diff for the chosen scope and passes it to
-`copilot -p` with no tool permissions, so Copilot only reasons over the diff.
-Its review is returned verbatim.
+`copilot -p` with the **write and shell tools denied** (`--deny-tool`), so
+Copilot cannot modify files or run commands while it reviews. It reasons over
+the assembled diff and its findings are returned verbatim.
 
 ## Development
 

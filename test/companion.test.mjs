@@ -2,6 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { run } from "../scripts/lib/process.mjs";
 import { tempRepo, write, git } from "./helpers.mjs";
 
@@ -97,4 +99,11 @@ test("review with an invalid --scope value fails fast", () => {
   const r = companion(["review", "--scope", "brnach"], dir);
   assert.equal(r.code, 2);
   assert.match(r.stdout, /Invalid --scope/);
+});
+
+test("review outside a git repository errors instead of reporting clean", () => {
+  const dir = mkdtempSync(join(tmpdir(), "nogit-"));
+  const r = companion(["review"], dir);
+  assert.equal(r.code, 1);
+  assert.match(r.stdout, /Cannot review|git diff failed|not a git/i);
 });
