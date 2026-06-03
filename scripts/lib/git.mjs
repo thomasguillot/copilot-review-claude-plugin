@@ -137,7 +137,10 @@ export function resolveScope({ scope = "working-tree", base = null, cwd = proces
       // No commits yet: diff the working tree against the empty tree so BOTH
       // staged and later-unstaged edits to tracked files are captured
       // (`--cached` alone would miss unstaged changes to already-staged files).
-      const emptyTree = run("git", ["hash-object", "-t", "tree", "/dev/null"], { cwd }).stdout.trim();
+      // Compute the empty-tree hash from empty stdin (portable; no /dev/null,
+      // which doesn't exist on Windows) — this also adapts to the repo's hash
+      // algorithm (SHA-1 vs SHA-256).
+      const emptyTree = run("git", ["hash-object", "-t", "tree", "--stdin"], { cwd, input: "" }).stdout.trim();
       trackedRes = run("git", ["diff", "--no-ext-diff", "--no-textconv", emptyTree], { cwd });
     }
     if (trackedRes.code !== 0) {
