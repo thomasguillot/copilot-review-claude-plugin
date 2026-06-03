@@ -17,6 +17,25 @@ all fixes are made by Claude Code (or you).
 /plugin install copilot-review
 ```
 
+Or install non-interactively by merging this into `~/.claude/settings.json` (or a
+project's `.claude/settings.json`) and restarting Claude Code:
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "copilot-review": {
+      "source": { "source": "github", "repo": "thomasguillot/copilot-review-claude-plugin" }
+    }
+  },
+  "enabledPlugins": { "copilot-review@copilot-review": true }
+}
+```
+
+Merge these keys into any existing `extraKnownMarketplaces` / `enabledPlugins`
+objects — don't replace the whole settings file. The `enabledPlugins` key is
+`<plugin>@<marketplace>`; here the plugin and the marketplace are both named
+`copilot-review`, hence `copilot-review@copilot-review`.
+
 ## Setup
 
 ```
@@ -58,18 +77,8 @@ A small Node script computes the diff for the chosen scope and passes it to
 Copilot cannot modify files or run commands while it reviews. It reasons over
 the assembled diff and its findings are returned verbatim.
 
-## For AI agents
-
-Agent-oriented install and usage instructions live in [`AGENTS.md`](AGENTS.md),
-including a non-interactive `settings.json` install path. `CLAUDE.md` imports it
-(`@AGENTS.md`) so Claude Code picks it up automatically.
-
 ## Development
 
 ```
 npm test
 ```
-
-## License
-
-MIT © Thomas Guillot
