@@ -1,5 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { symlinkSync, writeFileSync, mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { resolveScope } from "../scripts/lib/git.mjs";
 import { tempRepo, write, git } from "./helpers.mjs";
 
@@ -80,4 +83,29 @@ test("size cap truncates and records dropped files", () => {
   const r = resolveScope({ scope: "working-tree", cwd: dir, maxBytes: 20000 });
   assert.equal(r.truncated, true);
   assert.ok(r.droppedFiles.length > 0);
+});
+
+test("working-tree: untracked symlink is not dereferenced (no external leak)", () => {
+  const dir = tempRepo();
+  write(dir, "a.txt", "x\n");
+  git(dir, "add", "a.txt");
+  git(dir, "commit", "-q", "-m", "init");
+  const ext = join(mkdtempSync(join(tmpdir(), "ext-")), "secret.txt");
+  writeFileSync(ext, "EXTERNAL_SECRET\n");
+  symlinkSync(ext, join(dir, "link.txt"));
+  const r = resolveScope({ scope: "working-tree", cwd: dir });
+  assert.match(r.text, /link\.txt/);
+  assert.doesNotMatch(r.text, /EXTERNAL_SECRET/);
+});
+
+test("size cap still reviews a single oversized first file (no silent skip)", () => {
+  const dir = tempRepo();
+  write(dir, "seed.txt", "x\n");
+  git(dir, "add", "seed.txt");
+  git(dir, "commit", "-q", "-m", "init");
+  write(dir, "huge.txt", "z\n".repeat(20000)); // ~40 KB single untracked file
+  const r = resolveScope({ scope: "working-tree", cwd: dir, maxBytes: 10000 });
+  assert.equal(r.isEmpty, false);
+  assert.equal(r.truncated, true);
+  assert.match(r.text, /huge\.txt/);
 });

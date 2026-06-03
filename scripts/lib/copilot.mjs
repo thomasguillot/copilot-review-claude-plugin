@@ -30,9 +30,16 @@ export function cleanCopilotOutput(stdout) {
   return String(stdout ?? "").replace(/\r\n/g, "\n").trim();
 }
 
-export function runReview({ cwd, prompt, model = null, copilotBin = "copilot" }) {
-  const args = ["-p", prompt, "--no-color"];
+export function buildReviewArgs({ prompt, model = null }) {
+  // Review-only: deny write/shell so Copilot cannot edit files or run commands,
+  // regardless of the folder's trust settings. It only reasons over the diff.
+  const args = ["-p", prompt, "--no-color", "--deny-tool", "write", "--deny-tool", "shell"];
   if (model) args.push("--model", model);
+  return args;
+}
+
+export function runReview({ cwd, prompt, model = null, copilotBin = "copilot" }) {
+  const args = buildReviewArgs({ prompt, model });
   const res = run(copilotBin, args, { cwd });
   if (res.error) {
     return { ok: false, detail: `Could not run ${copilotBin}: ${res.error.code ?? res.error.message}`, output: "" };
