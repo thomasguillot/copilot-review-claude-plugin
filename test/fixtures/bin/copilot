@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Fake GitHub Copilot CLI for tests. Mimics the subset we use.
+case "$1" in
+  --version)
+    echo "copilot/1.0.59 (fake test stub)"
+    exit 0
+    ;;
+esac
+
+args="$*"
+if [[ "$args" == *"READY"* ]]; then
+  echo "READY"
+  exit 0
+fi
+
+cat <<'EOF'
+## Summary
+One potential issue found in the diff.
+
+## High
+- `a.txt:2` — example finding from stub reviewer.
+EOF
+exit 0
