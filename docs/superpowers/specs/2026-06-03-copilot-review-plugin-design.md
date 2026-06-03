@@ -102,7 +102,7 @@ copilot-review-claude-plugin/        ← public repo; also a one-plugin marketpl
   "name": "copilot-review",
   "version": "0.1.0",
   "description": "Use GitHub Copilot from Claude Code to review your code changes.",
-  "author": { "name": "Thomas Guillot" }
+  "author": { "name": "Thomas Guillot", "url": "https://github.com/thomasguillot" }
 }
 ```
 
@@ -110,7 +110,7 @@ copilot-review-claude-plugin/        ← public repo; also a one-plugin marketpl
 A minimal marketplace manifest pointing at this same repo as a single plugin, so
 the install flow is:
 ```
-/plugin marketplace add <your-gh>/copilot-review-claude-plugin
+/plugin marketplace add thomasguillot/copilot-review-claude-plugin
 /plugin install copilot-review
 ```
 
