@@ -1,0 +1,19 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "copilot-review",
+  "description": "GitHub Copilot as a code reviewer for Claude Code.",
+  "owner": {
+    "name": "Thomas Guillot",
+    "url": "https://github.com/thomasguillot"
+  },
+  "plugins": [
+    {
+      "name": "copilot-review",
+      "description": "Use GitHub Copilot from Claude Code to review your code changes.",
+      "author": { "name": "Thomas Guillot" },
+      "category": "development",
+      "source": "./",
+      "homepage": "https://github.com/thomasguillot/copilot-review-claude-plugin"
+    }
+  ]
+}
