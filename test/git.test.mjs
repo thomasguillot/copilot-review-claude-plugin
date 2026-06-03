@@ -40,6 +40,18 @@ test("working-tree: untracked file content appears", () => {
   assert.match(r.text, /hello-untracked/);
 });
 
+test("working-tree: untracked filename with a trailing space is read correctly", () => {
+  const dir = tempRepo();
+  write(dir, "a.txt", "x\n");
+  git(dir, "add", "a.txt");
+  git(dir, "commit", "-q", "-m", "init");
+  write(dir, "spacey.txt ", "spacey-content\n"); // trailing space in the name
+  const r = resolveScope({ scope: "working-tree", cwd: dir });
+  // NUL-delimited ls-files + no trimming preserves the exact name and reads it.
+  assert.match(r.text, /spacey\.txt/);
+  assert.match(r.text, /spacey-content/);
+});
+
 test("working-tree: no-HEAD repo with staged file", () => {
   const dir = tempRepo();
   write(dir, "first.txt", "content\n");

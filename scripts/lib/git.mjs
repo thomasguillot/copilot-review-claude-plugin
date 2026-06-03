@@ -137,9 +137,8 @@ export function resolveScope({ scope = "working-tree", base = null, cwd = proces
       // No commits yet: diff the working tree against the empty tree so BOTH
       // staged and later-unstaged edits to tracked files are captured
       // (`--cached` alone would miss unstaged changes to already-staged files).
-      // Compute the empty-tree hash from empty stdin (portable; no /dev/null,
-      // which doesn't exist on Windows) — this also adapts to the repo's hash
-      // algorithm (SHA-1 vs SHA-256).
+      // The empty-tree hash is computed from empty stdin (portable, no special
+      // filesystem path) — this also adapts to the repo's hash algorithm.
       const emptyTree = run("git", ["hash-object", "-t", "tree", "--stdin"], { cwd, input: "" }).stdout.trim();
       trackedRes = run("git", ["diff", "--no-ext-diff", "--no-textconv", emptyTree], { cwd });
     }
@@ -154,7 +153,7 @@ export function resolveScope({ scope = "working-tree", base = null, cwd = proces
         error: `git diff failed: ${(trackedRes.stderr || "").trim() || "not a git repository?"}`
       };
     }
-    const lsRes = run("git", ["ls-files", "--others", "--exclude-standard"], { cwd });
+    const lsRes = run("git", ["ls-files", "--others", "--exclude-standard", "-z"], { cwd });
     if (lsRes.code !== 0) {
       return {
         text: "",
@@ -166,7 +165,9 @@ export function resolveScope({ scope = "working-tree", base = null, cwd = proces
         error: `git ls-files failed: ${(lsRes.stderr || "").trim() || "not a git repository?"}`
       };
     }
-    const untracked = lsRes.stdout.split("\n").map((s) => s.trim()).filter(Boolean);
+    // NUL-delimited (-z) and no trimming, so pathnames containing newlines or
+    // leading/trailing spaces are preserved exactly.
+    const untracked = lsRes.stdout.split("\0").filter(Boolean);
     segments = [...splitDiffSegments(trackedRes.stdout), ...untrackedSegments(cwd, untracked)];
   }
 

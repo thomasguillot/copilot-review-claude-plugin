@@ -105,7 +105,14 @@ function cmdReview(flags, cwd) {
     return;
   }
 
-  const prompt = buildReviewPrompt({ diff: scope.text, scopeLabel: scope.scopeLabel, templatePath: TEMPLATE });
+  let prompt;
+  try {
+    prompt = buildReviewPrompt({ diff: scope.text, scopeLabel: scope.scopeLabel, templatePath: TEMPLATE });
+  } catch (err) {
+    out(`Cannot review: failed to load the review prompt template (${err.message}).`);
+    process.exitCode = 1;
+    return;
+  }
   const result = runReview({ cwd, prompt, model: flags.model });
 
   if (scope.truncated) {
