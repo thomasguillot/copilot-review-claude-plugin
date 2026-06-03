@@ -77,6 +77,11 @@ function cmdSetup(flags, cwd) {
 
 function cmdReview(flags, cwd) {
   const scope = resolveScope({ scope: flags.scope, base: flags.base, cwd });
+  if (scope.error) {
+    out(`Cannot review: ${scope.error}`);
+    process.exitCode = 1;
+    return;
+  }
   if (scope.isEmpty) {
     if (flags.scope === "branch" && scope.scopeLabel.includes("no base branch detected")) {
       out("Could not detect a base branch (looked for main/master/origin). Pass --base <ref> to specify one.");
