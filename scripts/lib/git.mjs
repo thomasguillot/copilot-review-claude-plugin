@@ -7,7 +7,7 @@ function hasHead(cwd) {
 }
 
 function detectBase(cwd) {
-  for (const ref of ["main", "master", "origin/HEAD"]) {
+  for (const ref of ["main", "master", "origin/main", "origin/master", "origin/HEAD"]) {
     if (run("git", ["rev-parse", "--verify", "--quiet", ref], { cwd }).code === 0) {
       return ref;
     }
