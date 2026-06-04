@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.1
+
+- Docs: simplified agent guidance (dropped `AGENTS.md`) and trimmed the README.
+- Docs: linked the changelog from the README.
+
 ## 1.0.0
 
 - Initial release.

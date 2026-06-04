@@ -82,3 +82,7 @@ the assembled diff and its findings are returned verbatim.
 ```
 npm test
 ```
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for release notes.
