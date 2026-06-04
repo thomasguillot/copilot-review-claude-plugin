@@ -86,3 +86,5 @@ npm test
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for release notes.
+
+<!-- sanity-check: throwaway, do not merge -->
