@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";
 import { dirname, join, delimiter } from "node:path";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { run } from "../scripts/lib/process.mjs";
 import { tempRepo, write, git } from "./helpers.mjs";
@@ -138,4 +138,120 @@ test("review strips surrounding quotes from a flag value", () => {
   assert.equal(r.code, 1);
   assert.match(r.stdout, /no-such-ref-xyz/);
   assert.doesNotMatch(r.stdout, /"no-such-ref-xyz"/); // quotes were stripped
+});
+
+test("stub still verifies auth via READY even when a JSON mode is set", () => {
+  const dir = tempRepo();
+  const r = companion(["setup", "--probe"], dir, { COPILOT_STUB_MODE: "json-findings" });
+  assert.equal(r.code, 0);
+  assert.match(r.stdout, /Auth verified/);
+});
+
+test("review rejects an invalid --format value", () => {
+  const dir = tempRepo();
+  write(dir, "a.txt", "one\n");
+  const r = companion(["review", "--format", "xml"], dir);
+  assert.equal(r.code, 2);
+  assert.match(r.stdout, /Invalid --format/i);
+});
+
+test("unknown flags are still rejected", () => {
+  const dir = tempRepo();
+  const r = companion(["review", "--nope"], dir);
+  assert.equal(r.code, 2);
+  assert.match(r.stdout, /Unknown option/i);
+});
+
+test("review --format json emits validated JSON with findings", () => {
+  const dir = tempRepo();
+  write(dir, "a.txt", "one\n");
+  const r = companion(["review", "--format", "json"], dir, { COPILOT_STUB_MODE: "json-findings" });
+  assert.equal(r.code, 0);
+  const parsed = JSON.parse(r.stdout);
+  assert.equal(parsed.verdict, "needs-attention");
+  assert.equal(parsed.findings.length, 1);
+  assert.equal(parsed.findings[0].severity, "high");
+});
+
+test("review --json (shorthand) emits a clean approve verdict", () => {
+  const dir = tempRepo();
+  write(dir, "a.txt", "one\n");
+  const r = companion(["review", "--json"], dir, { COPILOT_STUB_MODE: "json-clean" });
+  assert.equal(r.code, 0);
+  const parsed = JSON.parse(r.stdout);
+  assert.equal(parsed.verdict, "approve");
+  assert.deepEqual(parsed.findings, []);
+});
+
+test("review --format json retries once then fails loudly on malformed output", () => {
+  const dir = tempRepo();
+  write(dir, "a.txt", "one\n");
+  const callsFile = join(mkdtempSync(join(tmpdir(), "calls-")), "calls.log");
+  const r = companion(["review", "--format", "json"], dir, {
+    COPILOT_STUB_MODE: "json-malformed",
+    COPILOT_STUB_CALLS: callsFile
+  });
+  assert.notEqual(r.code, 0);
+  assert.equal(r.stdout.trim(), "", "stdout must stay empty on failure so JSON.parse is only attempted on success");
+  assert.match(r.stderr, /could not|parse|contract|valid/i);
+  const calls = readFileSync(callsFile, "utf8").trim().split("\n").length;
+  assert.equal(calls, 2, "should call copilot twice: initial + one retry");
+});
+
+test("review markdown path is unchanged (default format)", () => {
+  const dir = tempRepo();
+  write(dir, "a.txt", "one\n");
+  const r = companion(["review"], dir);
+  assert.equal(r.code, 0);
+  assert.match(r.stdout, /## Summary/);
+});
+
+test("review --format json makes exactly one call on a clean success", () => {
+  const dir = tempRepo();
+  write(dir, "a.txt", "one\n");
+  const callsFile = join(mkdtempSync(join(tmpdir(), "calls-ok-")), "calls.log");
+  const r = companion(["review", "--format", "json"], dir, {
+    COPILOT_STUB_MODE: "json-findings",
+    COPILOT_STUB_CALLS: callsFile
+  });
+  assert.equal(r.code, 0);
+  const calls = readFileSync(callsFile, "utf8").trim().split("\n").length;
+  assert.equal(calls, 1, "a successful structured review must not trigger a retry");
+});
+
+test("review --format json on a clean tree emits a valid clean approve object", () => {
+  const dir = tempRepo(); // no changes written → empty scope
+  const r = companion(["review", "--format", "json"], dir);
+  assert.equal(r.code, 0);
+  const parsed = JSON.parse(r.stdout); // must be pure JSON
+  assert.equal(parsed.verdict, "approve");
+  assert.deepEqual(parsed.findings, []);
+});
+
+test("review (markdown) on a clean tree still prints the plain nothing-to-review message", () => {
+  const dir = tempRepo();
+  const r = companion(["review"], dir);
+  assert.equal(r.code, 0);
+  assert.match(r.stdout, /[Nn]othing to review/);
+});
+
+test("review --format=json (equals form) is accepted", () => {
+  const dir = tempRepo();
+  write(dir, "a.txt", "one\n");
+  const r = companion(["review", "--format=json"], dir, { COPILOT_STUB_MODE: "json-clean" });
+  assert.equal(r.code, 0);
+  const parsed = JSON.parse(r.stdout);
+  assert.equal(parsed.verdict, "approve");
+});
+
+test("review --format json fails (no partial JSON) when the diff is truncated", () => {
+  const dir = tempRepo();
+  // resolveScope uses maxBytes=200000 (200 KB). Write untracked files totalling
+  // well above that cap (~500 KB) so scope.truncated is guaranteed to be true.
+  const big = "y\n".repeat(10000); // ~20 KB each
+  for (let i = 0; i < 25; i++) write(dir, `big${i}.txt`, big);
+  const r = companion(["review", "--format", "json"], dir, { COPILOT_STUB_MODE: "json-clean" });
+  assert.notEqual(r.code, 0);
+  assert.match(r.stderr, /truncat/i);
+  assert.equal(r.stdout.trim(), "", "must not emit any JSON on a truncated diff");
 });

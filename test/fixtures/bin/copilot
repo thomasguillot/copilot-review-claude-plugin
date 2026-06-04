@@ -7,6 +7,12 @@ case "$1" in
     ;;
 esac
 
+# Optional call counter: append one line per invocation so tests can assert
+# how many times the CLI was called (e.g. the JSON retry path).
+if [[ -n "$COPILOT_STUB_CALLS" ]]; then
+  echo "call" >> "$COPILOT_STUB_CALLS"
+fi
+
 args="$*"
 if [[ "$args" == *"READY"* ]]; then
   echo "READY"
@@ -14,12 +20,28 @@ if [[ "$args" == *"READY"* ]]; then
 fi
 
 if [[ "$args" == *"BIGOUTPUT"* ]]; then
-  # Emit ~140 KB to exercise stdout draining on process exit.
   for i in $(seq 1 2000); do
     echo "LINE $i ----------------------------------------------------------------"
   done
   exit 0
 fi
+
+case "$COPILOT_STUB_MODE" in
+  json-clean)
+    echo '{"verdict":"approve","summary":"No issues found.","findings":[],"next_steps":[]}'
+    exit 0
+    ;;
+  json-findings)
+    cat <<'EOF'
+{"verdict":"needs-attention","summary":"One issue found.","findings":[{"severity":"high","title":"Example","body":"Example finding from stub reviewer.","file":"a.txt","line_start":2,"line_end":2,"confidence":0.9,"recommendation":"Fix it."}],"next_steps":["Fix the issue."]}
+EOF
+    exit 0
+    ;;
+  json-malformed)
+    echo 'not actually json {'
+    exit 0
+    ;;
+esac
 
 cat <<'EOF'
 ## Summary
