@@ -1,0 +1,61 @@
+name: version-bump
+
+# Every PR into main must bump the plugin version in
+# .claude-plugin/plugin.json, so the change reaches installed users on
+# `/plugin update`. To intentionally skip (e.g. a tiny change not worth a
+# release), add the `no-release` label to the PR.
+
+on:
+  pull_request:
+    branches: [main]
+    # `labeled` / `unlabeled` so toggling the skip label re-runs the check.
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+jobs:
+  check-version-bump:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Skip when 'no-release' label is present
+        if: contains(github.event.pull_request.labels.*.name, 'no-release')
+        run: echo "::notice::'no-release' label present — skipping version-bump check."
+
+      - name: Check out PR
+        if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-release') }}
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Require a version bump
+        if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-release') }}
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          MANIFEST: .claude-plugin/plugin.json
+        run: |
+          set -euo pipefail
+          git fetch --quiet --depth=1 origin "$BASE_REF"
+          git show "origin/$BASE_REF:$MANIFEST" > /tmp/base-plugin.json
+          node - "$MANIFEST" /tmp/base-plugin.json <<'NODE'
+          const fs = require("fs");
+          const [, , headPath, basePath] = process.argv;
+          const read = (p) => JSON.parse(fs.readFileSync(p, "utf8")).version;
+          const parse = (v) => String(v).split(".").map(Number);
+          const cmp = (a, b) => {
+            const x = parse(a), y = parse(b);
+            for (let i = 0; i < Math.max(x.length, y.length); i++) {
+              const d = (x[i] || 0) - (y[i] || 0);
+              if (d !== 0) return d;
+            }
+            return 0;
+          };
+          const head = read(headPath);
+          const base = read(basePath);
+          if (cmp(head, base) > 0) {
+            console.log(`OK: version bumped ${base} -> ${head}`);
+          } else {
+            console.error(
+              `::error::Version not bumped (base=${base}, PR=${head}). ` +
+              `Bump "version" in ${headPath}, or add the "no-release" label to skip.`
+            );
+            process.exit(1);
+          }
+          NODE
