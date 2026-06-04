@@ -118,7 +118,7 @@ function cmdReview(flags, cwd) {
     return;
   }
   if (scope.isEmpty) {
-    const noBase = flags.scope === "branch" && scope.scopeLabel.includes("no base branch detected");
+    const noBase = scope.noBaseDetected === true;
     if (flags.format === "json") {
       if (noBase) {
         process.stderr.write("Could not detect a base branch (looked for main/master/origin). Pass --base <ref> to specify one.\n");
