@@ -1,0 +1,78 @@
+name: version-bump
+
+# Every PR into main must bump the plugin version in
+# .claude-plugin/plugin.json, so the change reaches installed users on
+# `/plugin update`. To intentionally skip (e.g. a tiny change not worth a
+# release), add the `no-release` label to the PR.
+
+on:
+  pull_request:
+    branches: [main]
+    # `labeled` / `unlabeled` so toggling the skip label re-runs the check.
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+jobs:
+  check-version-bump:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Skip when 'no-release' label is present
+        if: contains(github.event.pull_request.labels.*.name, 'no-release')
+        run: echo "::notice::'no-release' label present — skipping version-bump check."
+
+      - name: Check out PR
+        if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-release') }}
+        uses: actions/checkout@v4
+        with:
+          # Shallow: we only need the head working tree; the base manifest is
+          # fetched separately below with --depth=1.
+          fetch-depth: 1
+
+      - name: Require a version bump
+        if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-release') }}
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          MANIFEST: .claude-plugin/plugin.json
+        run: |
+          set -euo pipefail
+          git fetch --quiet --depth=1 origin "$BASE_REF"
+          git show "origin/$BASE_REF:$MANIFEST" > /tmp/base-plugin.json
+          node - "$MANIFEST" /tmp/base-plugin.json <<'NODE'
+          const fs = require("fs");
+          const [, , headPath, basePath] = process.argv;
+          // Plugin versions must be strict MAJOR.MINOR.PATCH (numeric only).
+          const SEMVER = /^\d+\.\d+\.\d+$/;
+          const read = (label, p) => {
+            const v = JSON.parse(fs.readFileSync(p, "utf8")).version;
+            if (typeof v !== "string" || !SEMVER.test(v)) {
+              console.error(
+                `::error::Invalid ${label} version ${JSON.stringify(v)} in ${p}. ` +
+                `Expected strict semver "MAJOR.MINOR.PATCH" (e.g. 1.0.2).`
+              );
+              process.exit(1);
+            }
+            return v;
+          };
+          const parse = (v) => v.split(".").map(Number);
+          const cmp = (a, b) => {
+            const x = parse(a), y = parse(b);
+            for (let i = 0; i < 3; i++) {
+              const d = x[i] - y[i];
+              if (d !== 0) return d;
+            }
+            return 0;
+          };
+          const head = read("PR", headPath);
+          const base = read("base", basePath);
+          if (cmp(head, base) > 0) {
+            console.log(`OK: version bumped ${base} -> ${head}`);
+          } else {
+            console.error(
+              `::error::Version not bumped (base=${base}, PR=${head}). ` +
+              `Bump "version" in ${headPath}, or add the "no-release" label to skip.`
+            );
+            process.exit(1);
+          }
+          NODE
