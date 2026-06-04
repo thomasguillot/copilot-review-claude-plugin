@@ -163,6 +163,7 @@ test("branch: diff against detected base (main)", () => {
   git(dir, "commit", "-q", "-m", "feature");
   const r = resolveScope({ scope: "branch", cwd: dir });
   assert.equal(r.scopeLabel.includes("main"), true);
+  assert.equal(r.noBaseDetected, false);
   assert.match(r.text, /\+feature-line/);
   assert.equal(r.fileCount, 1);
 });
@@ -225,4 +226,6 @@ test("branch base detection skips the current branch when it equals HEAD", () =>
   const r = resolveScope({ scope: "branch", cwd: dir });
   // No other base exists, so it falls back with the "no base branch detected" note.
   assert.match(r.scopeLabel, /no base branch detected/);
+  // ...and exposes that as an explicit flag, not just label text.
+  assert.equal(r.noBaseDetected, true);
 });

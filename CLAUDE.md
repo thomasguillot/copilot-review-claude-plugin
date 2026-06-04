@@ -15,6 +15,7 @@ Claude Code (or the user). End-user install, auth, and usage details live in
 - `/copilot-review:review [--scope working-tree|branch] [--base <ref>] [--model <m>]`
   — review the current git changes; Copilot's findings are returned verbatim.
   Default scope is the working tree (uncommitted changes).
+  Add `--format json` (alias `--json`) for a validated structured review (`schemas/review-output.schema.json`); markdown remains the default.
 
 ## Architecture
 
@@ -27,6 +28,9 @@ one-shot per review.
 - `scripts/lib/git.mjs` — `resolveScope()`: builds the diff for working-tree or branch scope, with a byte cap, untracked-file handling (binary/symlink/odd names), and clear git-failure reporting.
 - `scripts/lib/copilot.mjs` — prompt building, auth status/probe, and `runReview()` (the review-only `copilot` invocation).
 - `prompts/review.md` — the reviewer prompt template (`{{SCOPE}}` / `{{DIFF}}`).
+- `schemas/review-output.schema.json` — the shared finding contract (also consumed by the `the-reviewer` orchestrator).
+- `scripts/lib/schema.mjs` — minimal dependency-free validator used by JSON review mode.
+- `prompts/review-json.md` — the JSON reviewer prompt template.
 - `commands/` — the two slash-command definitions.
 - `test/` — `node:test` suite plus a stub `copilot` binary, so it runs without a Copilot subscription.
 

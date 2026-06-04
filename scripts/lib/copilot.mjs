@@ -1,5 +1,27 @@
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import { run } from "./process.mjs";
+import { validate } from "./schema.mjs";
+
+// The review-output contract is loaded lazily and cached on first use, so a
+// missing/corrupt schema only affects the JSON review path (with a controlled
+// error) — it never crashes the module at import time or the markdown path.
+let schemaCache;
+let schemaLoaded = false;
+function getSchema() {
+  if (!schemaLoaded) {
+    schemaLoaded = true;
+    try {
+      schemaCache = JSON.parse(
+        readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "..", "schemas", "review-output.schema.json"), "utf8")
+      );
+    } catch {
+      schemaCache = null;
+    }
+  }
+  return schemaCache;
+}
 
 const AUTH_ENV_VARS = ["COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN"];
 
@@ -83,4 +105,97 @@ export function probeAuth({ cwd, copilotBin = "copilot" }) {
   }
   const how = res.signal ? `terminated by signal ${res.signal}` : `exited ${res.code}`;
   return { ok: false, detail: (res.stderr || res.stdout || `${copilotBin} ${how}`).trim() };
+}
+
+// Return the substring from `start` to its matching closing brace, accounting
+// for braces that appear inside JSON string literals. Returns null if the
+// object never closes (unbalanced).
+function balancedObject(text, start) {
+  let depth = 0;
+  let inStr = false;
+  let escaped = false;
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+    if (inStr) {
+      if (escaped) escaped = false;
+      else if (ch === "\\") escaped = true;
+      else if (ch === '"') inStr = false;
+      continue;
+    }
+    if (ch === '"') inStr = true;
+    else if (ch === "{") depth++;
+    else if (ch === "}") {
+      depth--;
+      if (depth === 0) return text.slice(start, i + 1);
+    }
+  }
+  return null;
+}
+
+// Cross-field checks the JSON Schema cannot express. Returns an error string
+// if the review object is internally contradictory, else null.
+function reviewConsistencyError(data) {
+  const count = Array.isArray(data.findings) ? data.findings.length : 0;
+  if (data.verdict === "approve" && count > 0) {
+    return `Inconsistent review: verdict "approve" with ${count} finding(s).`;
+  }
+  if (data.verdict === "needs-attention" && count === 0) {
+    return `Inconsistent review: verdict "needs-attention" with no findings.`;
+  }
+  for (const f of data.findings || []) {
+    if (typeof f.line_start === "number" && typeof f.line_end === "number" && f.line_end < f.line_start) {
+      return `Invalid finding range in "${f.title}": line_end (${f.line_end}) < line_start (${f.line_start}).`;
+    }
+  }
+  return null;
+}
+
+// Extract a JSON review object from a model response that may include stray
+// prose or ```code fences```, then validate it against the shared contract and
+// internal-consistency rules. Requires EXACTLY ONE valid review object: zero
+// means fail (retry/fail loud); more than one is ambiguous and also fails, so a
+// stray/echoed object can never be silently accepted in place of the real one.
+export function parseStructuredReview(stdout) {
+  const schema = getSchema();
+  if (!schema) {
+    return { ok: false, data: null, error: "Review schema unavailable (could not load review-output.schema.json)." };
+  }
+  const text = String(stdout ?? "");
+  const valid = [];
+  let lastError = null;
+  let i = text.indexOf("{");
+  while (i !== -1) {
+    const slice = balancedObject(text, i);
+    if (!slice) {
+      i = text.indexOf("{", i + 1);
+      continue;
+    }
+    let data;
+    try {
+      data = JSON.parse(slice);
+    } catch (err) {
+      lastError = `Could not parse JSON: ${err.message}`;
+      i = text.indexOf("{", i + slice.length);
+      continue;
+    }
+    const result = validate(data, schema);
+    if (result.ok) {
+      const consErr = reviewConsistencyError(data);
+      if (consErr) {
+        lastError = consErr;
+      } else {
+        valid.push(data);
+      }
+      // Skip past this whole object; do not descend into its inner braces.
+      i = text.indexOf("{", i + slice.length);
+    } else {
+      lastError = `JSON did not match contract: ${result.errors.join("; ")}`;
+      i = text.indexOf("{", i + slice.length);
+    }
+  }
+  if (valid.length === 1) return { ok: true, data: valid[0], error: null };
+  if (valid.length > 1) {
+    return { ok: false, data: null, error: `Ambiguous output: ${valid.length} structured review objects found.` };
+  }
+  return { ok: false, data: null, error: lastError || "No JSON object found in Copilot response." };
 }

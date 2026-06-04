@@ -67,6 +67,10 @@ Review a branch against its base:
 
 Options: `--scope working-tree|branch`, `--base <ref>`, `--model <model>`.
 
+### Structured (JSON) output
+
+`/copilot-review:review --format json` (or `--json`) returns a validated JSON object — `verdict`, `summary`, `findings[]` (each with `severity`, `title`, `body`, `file`, `line_start`/`line_end`, `confidence`, `recommendation`), and `next_steps` — instead of markdown. If Copilot returns output that doesn't match the contract, the command retries once and then fails rather than emitting an invalid result.
+
 Want a review loop? Just tell Claude: "fix the High findings and run
 `/copilot-review:review` again," and repeat until it's clean.
 

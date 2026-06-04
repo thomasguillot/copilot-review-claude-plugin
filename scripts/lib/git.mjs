@@ -121,6 +121,9 @@ function gitFailDetail(res, label, fallback) {
 export function resolveScope({ scope = "working-tree", base = null, cwd = process.cwd(), maxBytes = 200000 } = {}) {
   let segments = [];
   let scopeLabel;
+  // Explicit signal that branch scope fell back to HEAD with no detectable base
+  // branch, so callers don't have to parse scopeLabel's human-readable text.
+  let noBaseDetected = false;
 
   // Fail clearly if git itself can't be run, before interpreting any exit codes.
   const gitCheck = run("git", ["rev-parse", "--is-inside-work-tree"], { cwd });
@@ -149,7 +152,8 @@ export function resolveScope({ scope = "working-tree", base = null, cwd = proces
       };
     }
     const ref = base || detectBase(cwd);
-    const baseNote = !base && ref === "HEAD" ? " — no base branch detected" : "";
+    noBaseDetected = !base && ref === "HEAD";
+    const baseNote = noBaseDetected ? " — no base branch detected" : "";
     scopeLabel = `branch diff (${ref}...HEAD)${baseNote}`;
     const d = run("git", ["diff", "--no-ext-diff", "--no-textconv", `${ref}...HEAD`], { cwd });
     if (d.code !== 0 || d.error) {
@@ -215,6 +219,7 @@ export function resolveScope({ scope = "working-tree", base = null, cwd = proces
     droppedFiles,
     isEmpty: text.trim().length === 0,
     scopeLabel,
+    noBaseDetected,
     error: null
   };
 }
