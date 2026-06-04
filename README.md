@@ -83,6 +83,17 @@ the assembled diff and its findings are returned verbatim.
 npm test
 ```
 
+## Contributing
+
+Plugin updates reach installed users based on the `version` in
+`.claude-plugin/plugin.json` (not the GitHub release/tag), so **every PR into
+`main` must bump that version** — a CI check enforces it. Bump the appropriate
+digit (`MAJOR.MINOR.PATCH`) and add a matching entry to
+[CHANGELOG.md](CHANGELOG.md).
+
+For changes not worth a release (typos, internal tweaks), add the **`no-release`**
+label to the PR to skip the version-bump check.
+
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for release notes.
