@@ -4,9 +4,24 @@ import { dirname, join } from "node:path";
 import { run } from "./process.mjs";
 import { validate } from "./schema.mjs";
 
-const SCHEMA = JSON.parse(
-  readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "..", "schemas", "review-output.schema.json"), "utf8")
-);
+// The review-output contract is loaded lazily and cached on first use, so a
+// missing/corrupt schema only affects the JSON review path (with a controlled
+// error) — it never crashes the module at import time or the markdown path.
+let schemaCache;
+let schemaLoaded = false;
+function getSchema() {
+  if (!schemaLoaded) {
+    schemaLoaded = true;
+    try {
+      schemaCache = JSON.parse(
+        readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "..", "schemas", "review-output.schema.json"), "utf8")
+      );
+    } catch {
+      schemaCache = null;
+    }
+  }
+  return schemaCache;
+}
 
 const AUTH_ENV_VARS = ["COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN"];
 
@@ -141,6 +156,10 @@ function reviewConsistencyError(data) {
 // means fail (retry/fail loud); more than one is ambiguous and also fails, so a
 // stray/echoed object can never be silently accepted in place of the real one.
 export function parseStructuredReview(stdout) {
+  const schema = getSchema();
+  if (!schema) {
+    return { ok: false, data: null, error: "Review schema unavailable (could not load review-output.schema.json)." };
+  }
   const text = String(stdout ?? "");
   const valid = [];
   let lastError = null;
@@ -159,7 +178,7 @@ export function parseStructuredReview(stdout) {
       i = text.indexOf("{", i + slice.length);
       continue;
     }
-    const result = validate(data, SCHEMA);
+    const result = validate(data, schema);
     if (result.ok) {
       const consErr = reviewConsistencyError(data);
       if (consErr) {
