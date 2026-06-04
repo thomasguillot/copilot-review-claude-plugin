@@ -11,6 +11,9 @@ on:
     # `labeled` / `unlabeled` so toggling the skip label re-runs the check.
     types: [opened, synchronize, reopened, labeled, unlabeled]
 
+permissions:
+  contents: read
+
 jobs:
   check-version-bump:
     runs-on: ubuntu-latest
@@ -23,7 +26,9 @@ jobs:
         if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-release') }}
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          # Shallow: we only need the head working tree; the base manifest is
+          # fetched separately below with --depth=1.
+          fetch-depth: 1
 
       - name: Require a version bump
         if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-release') }}
