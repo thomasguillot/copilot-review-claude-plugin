@@ -95,15 +95,15 @@ function cmdSetup(flags, cwd) {
 }
 
 function cmdReview(flags, cwd) {
+  // Usage/validation errors (exit 2) go to stderr by CLI convention, leaving
+  // stdout empty so machine consumers never parse a usage message as output.
   if (flags.scope !== "working-tree" && flags.scope !== "branch") {
-    const msg = `Invalid --scope '${flags.scope}'. Use working-tree or branch.`;
-    if (flags.format === "json") process.stderr.write(msg + "\n");
-    else out(msg);
+    process.stderr.write(`Invalid --scope '${flags.scope}'. Use working-tree or branch.\n`);
     process.exitCode = 2;
     return;
   }
   if (flags.format !== "markdown" && flags.format !== "json") {
-    out(`Invalid --format '${flags.format}'. Use markdown or json.`);
+    process.stderr.write(`Invalid --format '${flags.format}'. Use markdown or json.\n`);
     process.exitCode = 2;
     return;
   }
@@ -215,14 +215,14 @@ const flags = parseFlags(rest);
 const cwd = process.cwd();
 
 if (flags.error) {
-  out(`Error: ${flags.error}`);
-  out("Usage: copilot-companion.mjs <setup|review> [--scope working-tree|branch] [--base <ref>] [--model <m>] [--probe] [--format markdown|json]");
+  process.stderr.write(`Error: ${flags.error}\n`);
+  process.stderr.write("Usage: copilot-companion.mjs <setup|review> [--scope working-tree|branch] [--base <ref>] [--model <m>] [--probe] [--format markdown|json]\n");
   process.exitCode = 2;
 } else if (cmd === "setup") {
   cmdSetup(flags, cwd);
 } else if (cmd === "review") {
   cmdReview(flags, cwd);
 } else {
-  out("Usage: copilot-companion.mjs <setup|review> [flags]");
+  process.stderr.write("Usage: copilot-companion.mjs <setup|review> [flags]\n");
   process.exitCode = 2;
 }

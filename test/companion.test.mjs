@@ -111,14 +111,16 @@ test("review with an invalid --scope value fails fast", () => {
   const dir = tempRepo();
   const r = companion(["review", "--scope", "brnach"], dir);
   assert.equal(r.code, 2);
-  assert.match(r.stdout, /Invalid --scope/);
+  assert.match(r.stderr, /Invalid --scope/);
+  assert.equal(r.stdout.trim(), "");
 });
 
 test("review rejects an unknown flag", () => {
   const dir = tempRepo();
   const r = companion(["review", "--scpoe", "branch"], dir);
   assert.equal(r.code, 2);
-  assert.match(r.stdout, /Unknown option/);
+  assert.match(r.stderr, /Unknown option/);
+  assert.equal(r.stdout.trim(), "");
 });
 
 test("review outside a git repository errors instead of reporting clean", () => {
@@ -152,14 +154,16 @@ test("review rejects an invalid --format value", () => {
   write(dir, "a.txt", "one\n");
   const r = companion(["review", "--format", "xml"], dir);
   assert.equal(r.code, 2);
-  assert.match(r.stdout, /Invalid --format/i);
+  assert.match(r.stderr, /Invalid --format/i);
+  assert.equal(r.stdout.trim(), "");
 });
 
 test("unknown flags are still rejected", () => {
   const dir = tempRepo();
   const r = companion(["review", "--nope"], dir);
   assert.equal(r.code, 2);
-  assert.match(r.stdout, /Unknown option/i);
+  assert.match(r.stderr, /Unknown option/i);
+  assert.equal(r.stdout.trim(), "");
 });
 
 test("review --format json emits validated JSON with findings", () => {
