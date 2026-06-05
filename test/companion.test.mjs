@@ -591,6 +591,7 @@ test("setup rejects enabling and disabling the gate at once", () => {
   const dir = tempRepo();
   const r = companion(["setup", "--enable-review-gate", "--disable-review-gate"], dir, { COPILOT_GITHUB_TOKEN: "abc" });
   assert.equal(r.code, 2);
+  assert.equal(r.stdout, "");
   assert.match(r.stderr, /both .*enable.*disable|cannot .*enable.*disable/i);
 });
 

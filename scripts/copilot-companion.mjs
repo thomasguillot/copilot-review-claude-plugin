@@ -455,7 +455,7 @@ if (cmd === "state") {
   const flags = parseFlags(rest);
   if (flags.error) {
     process.stderr.write(`Error: ${flags.error}\n`);
-    process.stderr.write("Usage: copilot-companion.mjs <setup|review|loop-config|filter|loop-review|state> [--scope working-tree|branch] [--base <ref>] [--model <m>] [--probe] [--format markdown|json] [--threshold <t>] [--min-confidence <0..1>] [--max-rounds <n>]\n");
+    process.stderr.write("Usage: copilot-companion.mjs <setup|review|loop-config|filter|loop-review|state> [--scope working-tree|branch] [--base <ref>] [--model <m>] [--probe] [--format markdown|json] [--threshold <t>] [--min-confidence <0..1>] [--max-rounds <n>] [--enable-review-gate|--disable-review-gate]\n");
     process.exitCode = 2;
   } else if (cmd === "setup") {
     cmdSetup(flags, cwd);
