@@ -52,10 +52,19 @@ function writeState(cwd, state) {
   const tmp = `${file}.${process.pid}.tmp`;
   writeFileSync(tmp, JSON.stringify(state), "utf8");
   try {
+    // POSIX-atomic fast path: rename overwrites the destination in place.
     renameSync(tmp, file);
   } catch (err) {
-    try { rmSync(tmp, { force: true }); } catch { /* best effort */ }
-    throw err;
+    // Windows: renameSync won't overwrite an existing destination, so updates
+    // after the first one fail. Retry after removing the destination (loses
+    // POSIX atomicity on Windows, but keeps state persistence working).
+    try {
+      rmSync(file, { force: true });
+      renameSync(tmp, file);
+    } catch (err2) {
+      try { rmSync(tmp, { force: true }); } catch { /* best effort */ }
+      throw err2;
+    }
   }
 }
 

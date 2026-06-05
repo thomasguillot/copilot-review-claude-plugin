@@ -316,6 +316,13 @@ function cmdFilter(flags, cwd) {
     process.exitCode = 1;
     return;
   }
+  if (review.findings.some((f) => !f || typeof f !== "object" || Array.isArray(f))) {
+    // Guard the untrusted-stdin boundary: filterFindings reads finding.severity,
+    // which would throw on a null/primitive element. Fail with a clear message.
+    process.stderr.write("filter: every entry in 'findings' must be a non-null object.\n");
+    process.exitCode = 1;
+    return;
+  }
   const { blocking, ignored, clean } = filterFindings(review.findings || [], {
     threshold: config.threshold,
     minConfidence: config.minConfidence,

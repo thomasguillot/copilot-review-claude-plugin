@@ -581,6 +581,15 @@ test("filter rejects a review object without a findings array", () => {
   assert.equal(r.stdout.trim(), "");
 });
 
+test("filter rejects a findings array containing a non-object element (e.g. null)", () => {
+  const dir = tempRepo();
+  const r = companionStdin(["filter"], dir, JSON.stringify({ findings: [null] }));
+  assert.notEqual(r.code, 0);
+  assert.doesNotMatch(r.stderr, /at .*\.mjs:\d+/); // controlled error, not a stack trace
+  assert.match(r.stderr, /findings/i);
+  assert.equal(r.stdout.trim(), "");
+});
+
 test("loop-config does not read a .copilot-review.json from outside the git root", () => {
   // Parent dir holds a config; a git repo nested inside it must NOT pick it up.
   const parent = mkdtempSync(join(tmpdir(), "outside-"));
