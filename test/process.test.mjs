@@ -36,3 +36,10 @@ test("run captures non-zero exit code", () => {
   assert.equal(res.code, 42);
   assert.equal(res.error, null);
 });
+
+test("run forwards a timeout and reports the killed child", () => {
+  // A 50ms cap against a 5s sleep: spawnSync kills it and sets signal (or an
+  // ETIMEDOUT error, platform-dependent). Either way it must not exit 0.
+  const r = run(process.execPath, ["-e", "setTimeout(()=>{}, 5000)"], { timeout: 50 });
+  assert.notEqual(r.code, 0);
+});

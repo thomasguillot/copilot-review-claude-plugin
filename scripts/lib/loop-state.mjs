@@ -12,8 +12,12 @@ import { run } from "./process.mjs";
 // Resolve the path the state is keyed on: the git root when inside a repo, so
 // `state get/dismiss/attempt` behave identically no matter which subdirectory
 // the command is run from. Falls back to the canonicalized cwd outside a repo.
-function repoKeyPath(cwd) {
-  const top = run("git", ["rev-parse", "--show-toplevel"], { cwd });
+// Exported for sibling state modules like gate.mjs.
+export function repoKeyPath(cwd) {
+  // Bound the git call: if it stalls (e.g. slow network FS), fall back to the
+  // cwd-based key rather than hanging callers — notably the Stop-gate hook,
+  // which calls this on every session end even when the gate is disabled.
+  const top = run("git", ["rev-parse", "--show-toplevel"], { cwd, timeout: 5000 });
   if (!top.error && top.code === 0 && top.stdout.trim()) {
     const root = top.stdout.trim();
     try { return realpathSync(root); } catch { return resolve(root); }

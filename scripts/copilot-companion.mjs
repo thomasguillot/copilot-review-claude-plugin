@@ -7,6 +7,7 @@ import { resolveScope } from "./lib/git.mjs";
 import { buildReviewPrompt, getAuthStatus, parseStructuredReview, probeAuth, runReview } from "./lib/copilot.mjs";
 import { resolveLoopConfig, filterFindings } from "./lib/loop.mjs";
 import { readState, setRound, addDismissed, addAttempted, clearState } from "./lib/loop-state.mjs";
+import { isGateEnabled, setGateEnabled } from "./lib/gate.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const TEMPLATE = join(here, "..", "prompts", "review.md");
@@ -18,11 +19,19 @@ function out(s) {
 
 function parseFlags(rest) {
   const tokens = rest.join(" ").trim().split(/\s+/).filter(Boolean);
-  const flags = { scope: "working-tree", base: null, model: null, probe: false, format: "markdown", error: null, maxRounds: undefined, threshold: undefined, minConfidence: undefined, scopeProvided: false };
+  const flags = { scope: "working-tree", base: null, model: null, probe: false, format: "markdown", error: null, maxRounds: undefined, threshold: undefined, minConfidence: undefined, scopeProvided: false, enableGate: false, disableGate: false };
   for (let i = 0; i < tokens.length; i++) {
     let name = tokens[i];
     if (name === "--probe") {
       flags.probe = true;
+      continue;
+    }
+    if (name === "--enable-review-gate") {
+      flags.enableGate = true;
+      continue;
+    }
+    if (name === "--disable-review-gate") {
+      flags.disableGate = true;
       continue;
     }
     if (name === "--json") {
@@ -79,8 +88,34 @@ function rejectLoopFlags(flags, command) {
   return false;
 }
 
+function rejectGateFlags(flags, command) {
+  const offenders = [];
+  if (flags.enableGate) offenders.push("--enable-review-gate");
+  if (flags.disableGate) offenders.push("--disable-review-gate");
+  if (offenders.length) {
+    process.stderr.write(`${command}: ${offenders.join(", ")} ${offenders.length > 1 ? "are" : "is"} only valid for setup.\n`);
+    process.exitCode = 2;
+    return true;
+  }
+  return false;
+}
+
 function cmdSetup(flags, cwd) {
   if (rejectLoopFlags(flags, "setup")) return;
+  if (flags.enableGate && flags.disableGate) {
+    process.stderr.write("setup: cannot both enable and disable the review gate in one run.\n");
+    process.exitCode = 2;
+    return;
+  }
+  try {
+    if (flags.enableGate) setGateEnabled(cwd, true);
+    else if (flags.disableGate) setGateEnabled(cwd, false);
+    out(`Stop review gate: ${isGateEnabled(cwd) ? "enabled" : "disabled"} (toggle with --enable-review-gate / --disable-review-gate)`);
+  } catch (err) {
+    process.stderr.write(`setup: could not update the review gate: ${err.message}\n`);
+    process.exitCode = 1;
+    return;
+  }
   const avail = binaryAvailable("copilot", ["--version"], { cwd });
   if (!avail.available) {
     out("GitHub Copilot CLI not found.");
@@ -116,6 +151,7 @@ function cmdSetup(flags, cwd) {
 
 function cmdReview(flags, cwd) {
   if (rejectLoopFlags(flags, "review")) return;
+  if (rejectGateFlags(flags, "review")) return;
   // Usage/validation errors (exit 2) go to stderr by CLI convention, leaving
   // stdout empty so machine consumers never parse a usage message as output.
   if (flags.scope !== "working-tree" && flags.scope !== "branch") {
@@ -271,6 +307,7 @@ function loadLoopConfig(flags, cwd) {
 }
 
 function cmdLoopConfig(flags, cwd) {
+  if (rejectGateFlags(flags, "loop-config")) return;
   const { config, error } = loadLoopConfig(flags, cwd);
   if (error) {
     process.stderr.write(error + "\n");
@@ -292,6 +329,7 @@ function readStdin() {
 // same threshold/confidence/dismissed logic as loop-review. Not used by /loop;
 // kept as a reusable seam (e.g. for the `the-reviewer` orchestrator) and tested.
 function cmdFilter(flags, cwd) {
+  if (rejectGateFlags(flags, "filter")) return;
   const { config, error } = loadLoopConfig(flags, cwd);
   if (error) {
     process.stderr.write(error + "\n");
@@ -381,6 +419,7 @@ function cmdState(rest, cwd) {
 }
 
 function cmdLoopReview(flags, cwd) {
+  if (rejectGateFlags(flags, "loop-review")) return;
   const { config, error } = loadLoopConfig(flags, cwd);
   if (error) {
     process.stderr.write(error + "\n");
@@ -438,7 +477,7 @@ if (cmd === "state") {
   const flags = parseFlags(rest);
   if (flags.error) {
     process.stderr.write(`Error: ${flags.error}\n`);
-    process.stderr.write("Usage: copilot-companion.mjs <setup|review|loop-config|filter|loop-review|state> [--scope working-tree|branch] [--base <ref>] [--model <m>] [--probe] [--format markdown|json] [--threshold <t>] [--min-confidence <0..1>] [--max-rounds <n>]\n");
+    process.stderr.write("Usage: copilot-companion.mjs <setup|review|loop-config|filter|loop-review|state> [--scope working-tree|branch] [--base <ref>] [--model <m>] [--probe] [--format markdown|json] [--threshold <t>] [--min-confidence <0..1>] [--max-rounds <n>] [--enable-review-gate|--disable-review-gate]\n");
     process.exitCode = 2;
   } else if (cmd === "setup") {
     cmdSetup(flags, cwd);

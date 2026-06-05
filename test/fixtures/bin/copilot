@@ -41,6 +41,11 @@ EOF
     echo 'not actually json {'
     exit 0
     ;;
+  sleep)
+    sleep 5
+    echo '{"verdict":"approve","summary":"","findings":[],"next_steps":[]}'
+    exit 0
+    ;;
 esac
 
 cat <<'EOF'

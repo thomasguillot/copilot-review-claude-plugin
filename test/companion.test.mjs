@@ -12,8 +12,10 @@ const COMPANION = join(here, "..", "scripts", "copilot-companion.mjs");
 const STUB_DIR = join(here, "fixtures", "bin");
 
 // Run the companion with the stub `copilot` on PATH.
+// Uses process.execPath so the correct node binary is found even when extraEnv
+// replaces PATH entirely (e.g. to simulate a missing tool like copilot).
 function companion(args, cwd, extraEnv = {}) {
-  return run("node", [COMPANION, ...args], {
+  return run(process.execPath, [COMPANION, ...args], {
     cwd,
     env: { ...process.env, PATH: `${STUB_DIR}${delimiter}${process.env.PATH ?? ""}`, ...extraEnv }
   });
@@ -320,7 +322,7 @@ test("loop-config rejects a non-numeric --min-confidence", () => {
   assert.equal(r.stdout.trim(), "");
 });
 
-import { addDismissed } from "../scripts/lib/loop-state.mjs";
+import { addDismissed, setRound, addAttempted, readState } from "../scripts/lib/loop-state.mjs";
 import { findingId } from "../scripts/lib/loop.mjs";
 
 function companionStdin(args, cwd, input, extraEnv = {}) {
@@ -562,6 +564,46 @@ test("setup rejects loop-only flags (fail loud)", () => {
   assert.match(r.stderr, /only valid for the loop/i);
 });
 
+test("setup reports the gate as disabled by default", () => {
+  const dir = tempRepo();
+  const r = companion(["setup"], dir, { COPILOT_GITHUB_TOKEN: "abc" });
+  assert.match(r.stdout, /review gate:\s*disabled/i);
+});
+
+test("setup --enable-review-gate enables the gate and reports it", () => {
+  const dir = tempRepo();
+  const r = companion(["setup", "--enable-review-gate"], dir, { COPILOT_GITHUB_TOKEN: "abc" });
+  assert.equal(r.code, 0, r.stderr);
+  assert.match(r.stdout, /review gate:\s*enabled/i);
+  const r2 = companion(["setup"], dir, { COPILOT_GITHUB_TOKEN: "abc" });
+  assert.match(r2.stdout, /review gate:\s*enabled/i);
+});
+
+test("setup --disable-review-gate turns the gate back off", () => {
+  const dir = tempRepo();
+  companion(["setup", "--enable-review-gate"], dir, { COPILOT_GITHUB_TOKEN: "abc" });
+  const r = companion(["setup", "--disable-review-gate"], dir, { COPILOT_GITHUB_TOKEN: "abc" });
+  assert.equal(r.code, 0, r.stderr);
+  assert.match(r.stdout, /review gate:\s*disabled/i);
+});
+
+test("setup rejects enabling and disabling the gate at once", () => {
+  const dir = tempRepo();
+  const r = companion(["setup", "--enable-review-gate", "--disable-review-gate"], dir, { COPILOT_GITHUB_TOKEN: "abc" });
+  assert.equal(r.code, 2);
+  assert.equal(r.stdout, "");
+  assert.match(r.stderr, /both .*enable.*disable|cannot .*enable.*disable/i);
+});
+
+test("setup --enable-review-gate persists even when Copilot is unavailable", () => {
+  const dir = tempRepo();
+  const r = companion(["setup", "--enable-review-gate"], dir, {
+    PATH: "/nonexistent-bin-dir",
+    COPILOT_GITHUB_TOKEN: "abc"
+  });
+  assert.match(r.stdout, /review gate:\s*enabled/i);
+});
+
 test("loop-review branch scope with no base errors even when there are uncommitted edits", () => {
   const dir = tempRepo();
   write(dir, "a.txt", "base\n");
@@ -610,4 +652,55 @@ test("loop-config returns a controlled error (not a stack trace) when .copilot-r
   assert.equal(r.code, 2);
   assert.doesNotMatch(r.stderr, /at .*\.mjs:\d+/); // no raw stack frames
   assert.match(r.stderr, /\.copilot-review\.json/);
+});
+
+test("setup command documents the review-gate toggles", () => {
+  const md = readFileSync(join(here, "..", "commands", "setup.md"), "utf8");
+  assert.match(md, /--enable-review-gate/);
+  assert.match(md, /--disable-review-gate/);
+});
+
+test("review rejects the gate flags (only valid for setup)", () => {
+  const dir = tempRepo();
+  const r = companion(["review", "--enable-review-gate"], dir, { COPILOT_GITHUB_TOKEN: "abc" });
+  assert.equal(r.code, 2);
+  assert.match(r.stderr, /only valid for setup/i);
+  assert.equal(r.stdout, "");
+});
+
+test("loop-review rejects the gate flags (only valid for setup)", () => {
+  const dir = tempRepo();
+  const r = companion(["loop-review", "--disable-review-gate"], dir, { COPILOT_GITHUB_TOKEN: "abc" });
+  assert.equal(r.code, 2);
+  assert.match(r.stderr, /only valid for setup/i);
+});
+
+test("setup reports a clean error (no stack trace) when the gate state cannot be written", () => {
+  const dir = tempRepo();
+  // Point the OS temp dir at a regular FILE so mkdirSync(.../copilot-review-loop) fails.
+  const fakeTmp = join(dir, "not-a-dir");
+  write(dir, "not-a-dir", "x"); // create the file
+  const r = companion(["setup", "--enable-review-gate"], dir, {
+    COPILOT_GITHUB_TOKEN: "abc",
+    TMPDIR: fakeTmp,
+    TMP: fakeTmp,
+    TEMP: fakeTmp
+  });
+  assert.equal(r.code, 1);
+  assert.match(r.stderr, /could not update the review gate/i);
+  // The clean message must be present and there must be no raw "Error:"/stack noise on stdout.
+  assert.doesNotMatch(r.stdout, /at Object\.|at \w+ \(/); // no stack frames leaked to stdout
+});
+
+test("loop-review does not mutate loop state (round/attempted) — safe for the gate to call", () => {
+  const dir = tempRepo();
+  write(dir, "a.txt", "one\n");
+  // Pre-seed state to non-defaults so any clobbering by loop-review would show.
+  setRound(dir, 3);
+  addAttempted(dir, "deadbeef");
+  const r = companion(["loop-review"], dir, { COPILOT_STUB_MODE: "json-findings" });
+  assert.equal(r.code, 0, r.stderr);
+  const s = readState(dir);
+  assert.equal(s.round, 3);                       // round counter untouched
+  assert.deepEqual(s.attempted, ["deadbeef"]);    // attempted set untouched
 });
