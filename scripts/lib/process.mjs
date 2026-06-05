@@ -4,6 +4,7 @@ export function run(cmd, args = [], opts = {}) {
   const res = spawnSync(cmd, args, {
     cwd: opts.cwd,
     input: opts.input,
+    timeout: opts.timeout,
     encoding: "utf8",
     maxBuffer: opts.maxBuffer ?? 64 * 1024 * 1024,
     env: opts.env ?? process.env
