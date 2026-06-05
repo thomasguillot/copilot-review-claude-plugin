@@ -27,4 +27,5 @@ still flagged, blocks the stop and hands off to `/copilot-review:loop`. It is
 Turn it off with `--disable-review-gate`. Every `setup` run reports the current
 gate status. The gate never edits code — it only blocks and points you at the
 loop. Automated orchestrators (e.g. `the-reviewer`) should disable it while they
-drive their own review loop.
+drive their own review loop. The gate runs as a `Stop` hook and therefore requires
+Node.js to be available in the environment where Claude Code executes hooks.

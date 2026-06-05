@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";
 import { dirname, join, delimiter } from "node:path";
-import { readFileSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import { run } from "../scripts/lib/process.mjs";
 import { tempRepo, write, git } from "./helpers.mjs";
 import { setGateEnabled } from "../scripts/lib/gate.mjs";
@@ -154,4 +154,22 @@ test("enabled gate forces working-tree scope, ignoring .copilot-review.json loop
   const r = hook(dir, { stubMode: "json-findings" });
   assert.equal(r.code, 0, r.stderr);
   assert.equal(r.stdout.trim(), "");
+});
+
+test("the gate hook script is executable (shebang form in hooks.json depends on it)", () => {
+  const mode = statSync(join(here, "..", "scripts", "stop-review-gate-hook.mjs")).mode;
+  assert.ok((mode & 0o111) !== 0, "stop-review-gate-hook.mjs must be executable (chmod +x)");
+});
+
+test("hooks.json invokes the gate script directly via its shebang (no bare 'node' prefix)", () => {
+  const manifest = JSON.parse(readFileSync(join(here, "..", "hooks", "hooks.json"), "utf8"));
+  const cmds = manifest.hooks.Stop.flatMap((g) => g.hooks).map((h) => h.command);
+  const gateCmd = cmds.find((c) => /stop-review-gate-hook\.mjs/.test(c));
+  assert.ok(gateCmd, "expected a Stop command referencing the gate script");
+  assert.doesNotMatch(gateCmd, /^\s*node\b/, "invoke the script directly via its shebang rather than a bare 'node' on PATH");
+});
+
+test("the gate hook script starts with a node shebang", () => {
+  const src = readFileSync(join(here, "..", "scripts", "stop-review-gate-hook.mjs"), "utf8");
+  assert.match(src.split("\n")[0], /^#!\/usr\/bin\/env node$/);
 });
