@@ -1,9 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readState, setRound, addDismissed, addAttempted, clearState } from "../scripts/lib/loop-state.mjs";
+import { tempRepo } from "./helpers.mjs";
 
 function freshRepo() {
   return mkdtempSync(join(tmpdir(), "loop-state-repo-"));
@@ -69,4 +70,17 @@ test("clearState resets attempted too", () => {
   addAttempted(dir, "k1");
   clearState(dir);
   assert.deepEqual(readState(dir).attempted, []);
+});
+
+test("state is keyed by git root: a subdirectory shares the repo-root state", () => {
+  const root = tempRepo();
+  const sub = join(root, "packages", "inner");
+  mkdirSync(sub, { recursive: true });
+  setRound(root, 4);
+  addDismissed(root, "abc123");
+  // Running from a subdirectory must resolve to the same git-root-keyed state.
+  const fromSub = readState(sub);
+  assert.equal(fromSub.round, 4);
+  assert.deepEqual(fromSub.dismissed, ["abc123"]);
+  clearState(root);
 });

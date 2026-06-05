@@ -1,22 +1,34 @@
-// Per-repo loop state (round counter + dismissed-finding keys), stored under the
-// OS temp dir keyed by a hash of the repo's absolute path. Kept out of the repo
-// so it never shows up in diffs; survives context resets within the same machine.
+// Per-repo loop state (round counter + dismissed/attempted finding ids), stored
+// under the OS temp dir keyed by a hash of the repo's git-root path. Kept out of
+// the repo so it never shows up in diffs; survives context resets within the
+// same machine.
 
 import { mkdirSync, readFileSync, writeFileSync, renameSync, rmSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve, dirname } from "node:path";
 import { createHash } from "node:crypto";
+import { run } from "./process.mjs";
 
-function stateFile(cwd) {
+// Resolve the path the state is keyed on: the git root when inside a repo, so
+// `state get/dismiss/attempt` behave identically no matter which subdirectory
+// the command is run from. Falls back to the canonicalized cwd outside a repo.
+function repoKeyPath(cwd) {
+  const top = run("git", ["rev-parse", "--show-toplevel"], { cwd });
+  if (!top.error && top.code === 0 && top.stdout.trim()) {
+    const root = top.stdout.trim();
+    try { return realpathSync(root); } catch { return resolve(root); }
+  }
   // Canonicalize so a symlinked path and its real path map to the same state
   // file (a spawned process's cwd is the realpath; resolve() alone keeps symlinks).
-  let canonical;
   try {
-    canonical = realpathSync(resolve(cwd));
+    return realpathSync(resolve(cwd));
   } catch {
-    canonical = resolve(cwd); // path may not exist yet
+    return resolve(cwd); // path may not exist yet
   }
-  const key = createHash("sha256").update(canonical).digest("hex").slice(0, 16);
+}
+
+function stateFile(cwd) {
+  const key = createHash("sha256").update(repoKeyPath(cwd)).digest("hex").slice(0, 16);
   const dir = join(tmpdir(), "copilot-review-loop");
   return join(dir, `${key}.json`);
 }
@@ -53,15 +65,15 @@ export function setRound(cwd, round) {
   writeState(cwd, s);
 }
 
-export function addDismissed(cwd, key) {
+export function addDismissed(cwd, id) {
   const s = readState(cwd);
-  if (!s.dismissed.includes(key)) s.dismissed.push(key);
+  if (!s.dismissed.includes(id)) s.dismissed.push(id);
   writeState(cwd, s);
 }
 
-export function addAttempted(cwd, key) {
+export function addAttempted(cwd, id) {
   const s = readState(cwd);
-  if (!s.attempted.includes(key)) s.attempted.push(key);
+  if (!s.attempted.includes(id)) s.attempted.push(id);
   writeState(cwd, s);
 }
 
