@@ -11,12 +11,17 @@ const HOOK = join(here, "..", "scripts", "stop-review-gate-hook.mjs");
 const STUB_DIR = join(here, "fixtures", "bin");
 
 // Invoke the hook with the stub `copilot` on PATH and a hook-input JSON on stdin.
-function hook(cwd, { stubMode, withStub = true } = {}) {
+function hook(cwd, { stubMode, withStub = true, timeoutMs } = {}) {
   const path = withStub ? `${STUB_DIR}${delimiter}${process.env.PATH ?? ""}` : "/nonexistent-bin-dir";
   return run(process.execPath, [HOOK], {
     cwd,
     input: JSON.stringify({ cwd }),
-    env: { ...process.env, PATH: path, ...(stubMode ? { COPILOT_STUB_MODE: stubMode } : {}) }
+    env: {
+      ...process.env,
+      PATH: path,
+      ...(stubMode ? { COPILOT_STUB_MODE: stubMode } : {}),
+      ...(timeoutMs ? { COPILOT_REVIEW_GATE_TIMEOUT_MS: String(timeoutMs) } : {})
+    }
   });
 }
 
@@ -87,4 +92,16 @@ test("malformed hook stdin does not crash the hook", () => {
     env: { ...process.env, PATH: `${STUB_DIR}${delimiter}${process.env.PATH ?? ""}` }
   });
   assert.equal(r.code, 0, r.stderr); // gate disabled for this dir → silent no-op
+});
+
+test("enabled gate + review times out: blocks with escape hatch", () => {
+  const dir = tempRepo();
+  write(dir, "a.txt", "one\n");
+  setGateEnabled(dir, true);
+  const r = hook(dir, { stubMode: "sleep", timeoutMs: 200 });
+  assert.equal(r.code, 0, r.stderr);
+  const payload = JSON.parse(r.stdout);
+  assert.equal(payload.decision, "block");
+  assert.match(payload.reason, /timed out or was killed|could not run/);
+  assert.match(payload.reason, /disable-review-gate/);
 });

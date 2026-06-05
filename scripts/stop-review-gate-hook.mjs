@@ -14,7 +14,8 @@ import { isGateEnabled } from "./lib/gate.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const COMPANION = join(here, "copilot-companion.mjs");
-const REVIEW_TIMEOUT_MS = 15 * 60 * 1000;
+// Override the review timeout via env (mainly for tests / slow machines).
+const REVIEW_TIMEOUT_MS = Number(process.env.COPILOT_REVIEW_GATE_TIMEOUT_MS) || 15 * 60 * 1000;
 const DISABLE_HINT = "run /copilot-review:setup --disable-review-gate to turn off this gate";
 
 function readHookInput() {
@@ -71,6 +72,9 @@ function main() {
     return;
   }
 
+  // Defense-in-depth: a `loop-review` that exits 0 always prints valid JSON, so
+  // this catch only guards against a future companion change. Block (fail-closed)
+  // rather than silently allow if that invariant ever breaks.
   let result;
   try {
     result = JSON.parse(res.stdout);
