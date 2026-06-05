@@ -88,6 +88,18 @@ function rejectLoopFlags(flags, command) {
   return false;
 }
 
+function rejectGateFlags(flags, command) {
+  const offenders = [];
+  if (flags.enableGate) offenders.push("--enable-review-gate");
+  if (flags.disableGate) offenders.push("--disable-review-gate");
+  if (offenders.length) {
+    process.stderr.write(`${command}: ${offenders.join(", ")} ${offenders.length > 1 ? "are" : "is"} only valid for setup.\n`);
+    process.exitCode = 2;
+    return true;
+  }
+  return false;
+}
+
 function cmdSetup(flags, cwd) {
   if (rejectLoopFlags(flags, "setup")) return;
   if (flags.enableGate && flags.disableGate) {
@@ -133,6 +145,7 @@ function cmdSetup(flags, cwd) {
 
 function cmdReview(flags, cwd) {
   if (rejectLoopFlags(flags, "review")) return;
+  if (rejectGateFlags(flags, "review")) return;
   // Usage/validation errors (exit 2) go to stderr by CLI convention, leaving
   // stdout empty so machine consumers never parse a usage message as output.
   if (flags.scope !== "working-tree" && flags.scope !== "branch") {
@@ -288,6 +301,7 @@ function loadLoopConfig(flags, cwd) {
 }
 
 function cmdLoopConfig(flags, cwd) {
+  if (rejectGateFlags(flags, "loop-config")) return;
   const { config, error } = loadLoopConfig(flags, cwd);
   if (error) {
     process.stderr.write(error + "\n");
@@ -309,6 +323,7 @@ function readStdin() {
 // same threshold/confidence/dismissed logic as loop-review. Not used by /loop;
 // kept as a reusable seam (e.g. for the `the-reviewer` orchestrator) and tested.
 function cmdFilter(flags, cwd) {
+  if (rejectGateFlags(flags, "filter")) return;
   const { config, error } = loadLoopConfig(flags, cwd);
   if (error) {
     process.stderr.write(error + "\n");
@@ -398,6 +413,7 @@ function cmdState(rest, cwd) {
 }
 
 function cmdLoopReview(flags, cwd) {
+  if (rejectGateFlags(flags, "loop-review")) return;
   const { config, error } = loadLoopConfig(flags, cwd);
   if (error) {
     process.stderr.write(error + "\n");

@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join, delimiter } from "node:path";
 import { readFileSync } from "node:fs";
 import { run } from "../scripts/lib/process.mjs";
-import { tempRepo, write } from "./helpers.mjs";
+import { tempRepo, write, git } from "./helpers.mjs";
 import { setGateEnabled } from "../scripts/lib/gate.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -103,7 +103,7 @@ test("enabled gate + review times out: blocks with escape hatch", () => {
   assert.equal(r.code, 0, r.stderr);
   const payload = JSON.parse(r.stdout);
   assert.equal(payload.decision, "block");
-  assert.match(payload.reason, /timed out or was killed|could not run/);
+  assert.match(payload.reason, /timed out or was killed/);
   assert.match(payload.reason, /disable-review-gate/);
 });
 
@@ -113,4 +113,32 @@ test("hooks.json registers the Stop hook pointing at the gate script", () => {
   const cmds = manifest.hooks.Stop.flatMap((g) => g.hooks).map((h) => h.command);
   assert.ok(cmds.some((c) => /stop-review-gate-hook\.mjs/.test(c)), "Stop hook should run the gate script");
   assert.ok(cmds.some((c) => c.includes("${CLAUDE_PLUGIN_ROOT}")), "should reference CLAUDE_PLUGIN_ROOT");
+});
+
+test("gate review timeout default stays safely under the Stop hook timeout", () => {
+  const src = readFileSync(join(here, "..", "scripts", "stop-review-gate-hook.mjs"), "utf8");
+  const m = src.match(/\|\|\s*(\d+)\s*\*\s*60\s*\*\s*1000/);
+  assert.ok(m, "expected an `N * 60 * 1000` review-timeout default in the hook");
+  const internalSeconds = Number(m[1]) * 60;
+  const manifest = JSON.parse(readFileSync(join(here, "..", "hooks", "hooks.json"), "utf8"));
+  const hookTimeout = manifest.hooks.Stop.flatMap((g) => g.hooks).map((h) => h.timeout).find((t) => typeof t === "number");
+  assert.ok(internalSeconds < hookTimeout, `internal review timeout (${internalSeconds}s) must be < the Stop hook timeout (${hookTimeout}s)`);
+});
+
+test("enabled gate forces working-tree scope, ignoring .copilot-review.json loop.scope=branch", () => {
+  const dir = tempRepo();
+  // Commit a change so a branch diff exists, but leave the WORKING TREE clean.
+  write(dir, "a.txt", "one\n");
+  git(dir, "add", "a.txt");
+  git(dir, "commit", "-q", "-m", "c");
+  write(dir, ".copilot-review.json", JSON.stringify({ loop: { scope: "branch" } }));
+  git(dir, "add", ".copilot-review.json");
+  git(dir, "commit", "-q", "-m", "cfg");
+  setGateEnabled(dir, true);
+  // Forced working-tree scope sees a clean tree => "nothing to review" => allow stop.
+  // (Without the forced scope, branch scope on a repo whose HEAD==main has no
+  // detectable base and loop-review would exit non-zero => an erroneous block.)
+  const r = hook(dir, { stubMode: "json-findings" });
+  assert.equal(r.code, 0, r.stderr);
+  assert.equal(r.stdout.trim(), "");
 });

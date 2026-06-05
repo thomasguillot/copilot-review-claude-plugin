@@ -659,3 +659,18 @@ test("setup command documents the review-gate toggles", () => {
   assert.match(md, /--enable-review-gate/);
   assert.match(md, /--disable-review-gate/);
 });
+
+test("review rejects the gate flags (only valid for setup)", () => {
+  const dir = tempRepo();
+  const r = companion(["review", "--enable-review-gate"], dir, { COPILOT_GITHUB_TOKEN: "abc" });
+  assert.equal(r.code, 2);
+  assert.match(r.stderr, /only valid for setup/i);
+  assert.equal(r.stdout, "");
+});
+
+test("loop-review rejects the gate flags (only valid for setup)", () => {
+  const dir = tempRepo();
+  const r = companion(["loop-review", "--disable-review-gate"], dir, { COPILOT_GITHUB_TOKEN: "abc" });
+  assert.equal(r.code, 2);
+  assert.match(r.stderr, /only valid for setup/i);
+});

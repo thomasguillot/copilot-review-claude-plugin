@@ -14,8 +14,10 @@ import { isGateEnabled } from "./lib/gate.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const COMPANION = join(here, "copilot-companion.mjs");
-// Override the review timeout via env (mainly for tests / slow machines).
-const REVIEW_TIMEOUT_MS = Number(process.env.COPILOT_REVIEW_GATE_TIMEOUT_MS) || 15 * 60 * 1000;
+// Kept safely BELOW the Stop hook's own timeout in hooks.json (900s) so this
+// process has headroom to emit the block decision before Claude Code kills the
+// hook — otherwise a timeout would silently fail OPEN. Overridable via env for tests.
+const REVIEW_TIMEOUT_MS = Number(process.env.COPILOT_REVIEW_GATE_TIMEOUT_MS) || 14 * 60 * 1000;
 const DISABLE_HINT = "run /copilot-review:setup --disable-review-gate to turn off this gate";
 
 function readHookInput() {
@@ -56,11 +58,19 @@ function main() {
     return;
   }
 
-  const res = run(process.execPath, [COMPANION, "loop-review"], { cwd, timeout: REVIEW_TIMEOUT_MS });
+  // The gate always reviews the WORKING TREE (a flag overrides any scope set in
+  // .copilot-review.json), matching the documented "reviews your working-tree
+  // changes" behavior and avoiding a clean-tree session being blocked on a
+  // committed branch diff.
+  // NOTE (known limitation): the timeout bounds this companion process; a hung
+  // `copilot` grandchild may briefly outlive it (pre-existing in the /loop and
+  // /review paths too). The block decision is still emitted correctly.
+  const res = run(process.execPath, [COMPANION, "loop-review", "--scope", "working-tree"], { cwd, timeout: REVIEW_TIMEOUT_MS });
 
   if (res.error || res.signal) {
-    const why = res.signal
-      ? `the review timed out or was killed (signal ${res.signal})`
+    const timedOut = Boolean(res.signal) || res.error?.code === "ETIMEDOUT";
+    const why = timedOut
+      ? `the review timed out or was killed${res.signal ? ` (signal ${res.signal})` : ""}`
       : `the review could not run (${res.error.code ?? res.error.message})`;
     emitBlock(`Copilot review gate: ${why}. Run /copilot-review:loop to review and fix, or ${DISABLE_HINT}.`);
     return;
