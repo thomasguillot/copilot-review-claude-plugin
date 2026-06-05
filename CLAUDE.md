@@ -37,7 +37,7 @@ one-shot per review.
 - `scripts/lib/schema.mjs` — minimal dependency-free validator used by JSON review mode.
 - `prompts/review-json.md` — the JSON reviewer prompt template.
 - `scripts/lib/loop.mjs` — pure loop helpers: severity ranking, finding keys, findings filter, and loop-config resolution.
-- `scripts/lib/loop-state.mjs` — per-repo loop state (round counter + dismissed + attempted keys), stored under the OS temp dir.
+- `scripts/lib/loop-state.mjs` — per-repo loop state (round counter + dismissed + attempted finding ids), stored under the OS temp dir.
 - Companion subcommands `loop-config` / `loop-review` / `state` back the `/copilot-review:loop` command (`filter` is a standalone composable helper: review JSON on stdin → filtered result).
 - `commands/` — the two slash-command definitions.
 - `test/` — `node:test` suite plus a stub `copilot` binary, so it runs without a Copilot subscription.
