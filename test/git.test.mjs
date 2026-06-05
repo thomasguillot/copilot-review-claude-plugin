@@ -297,3 +297,17 @@ test("branch: a base ref starting with '-' is rejected (option-injection guard)"
   assert.equal(r.isEmpty, true);
   assert.match(r.error, /starting with '-'|not allowed/i);
 });
+
+test("branch+includeWorktree fails loud when there is no merge base (unrelated histories)", () => {
+  const dir = tempRepo();
+  write(dir, "a.txt", "base\n");
+  git(dir, "add", "a.txt"); git(dir, "commit", "-q", "-m", "base"); // on main
+  // An orphan branch has no common ancestor with main.
+  git(dir, "checkout", "-q", "--orphan", "unrelated");
+  write(dir, "o.txt", "orphan\n");
+  git(dir, "add", "o.txt"); git(dir, "commit", "-q", "-m", "orphan-root");
+  git(dir, "checkout", "-q", "main");
+  const r = resolveScope({ scope: "branch", base: "unrelated", cwd: dir, includeWorktree: true });
+  assert.equal(r.isEmpty, true);
+  assert.match(r.error, /merge base|common ancestor/i);
+});

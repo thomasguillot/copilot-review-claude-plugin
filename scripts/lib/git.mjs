@@ -171,7 +171,15 @@ export function resolveScope({ scope = "working-tree", base = null, cwd = proces
     if (includeWorktree) {
       scopeLabel = `branch diff (${ref} vs working tree)${baseNote}`;
       const mb = run("git", ["merge-base", ref, "HEAD"], { cwd });
-      const baseCommit = (!mb.error && mb.code === 0 && mb.stdout.trim()) ? mb.stdout.trim() : ref;
+      // Fail loud on a missing merge base (e.g. unrelated histories). Falling
+      // back to `ref` would diff against the base TIP, silently pulling in
+      // upstream-only commits after divergence — the opposite of the
+      // merge-base→working-tree semantics this scope promises. (When no base is
+      // detected, ref === "HEAD" and `merge-base HEAD HEAD` still succeeds.)
+      if (mb.error || mb.code !== 0 || !mb.stdout.trim()) {
+        return { text: "", fileCount: 0, truncated: false, droppedFiles: [], isEmpty: true, scopeLabel, noBaseDetected, error: gitFailDetail(mb, `Could not find a merge base with '${ref}'`, "no common ancestor (unrelated histories?)") };
+      }
+      const baseCommit = mb.stdout.trim();
       const d = run("git", ["diff", "--no-ext-diff", "--no-textconv", baseCommit], { cwd });
       if (d.code !== 0 || d.error) {
         return { text: "", fileCount: 0, truncated: false, droppedFiles: [], isEmpty: true, scopeLabel, noBaseDetected, error: gitFailDetail(d, `Could not diff against base '${ref}'`, "git diff failed") };
