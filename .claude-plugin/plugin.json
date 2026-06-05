@@ -1,6 +1,6 @@
 {
   "name": "copilot-review",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Use GitHub Copilot from Claude Code to review your code changes.",
   "author": {
     "name": "Thomas Guillot",

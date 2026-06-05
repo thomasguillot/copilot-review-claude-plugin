@@ -89,6 +89,14 @@ Configure defaults in `.copilot-review.json`:
 
 Flags override the file. Unlike `/copilot-review:review`, this command edits code.
 
+### Stop-time review gate (optional, off by default)
+
+Run `/copilot-review:setup --enable-review-gate` to make Copilot review your
+changes before a session can end; if anything is flagged, the session is blocked
+until you run `/copilot-review:loop` (or dismiss the findings there). It is a
+per-repo, machine-local toggle — disable it with
+`/copilot-review:setup --disable-review-gate`.
+
 ## How it works
 
 A small Node script computes the diff for the chosen scope and passes it to

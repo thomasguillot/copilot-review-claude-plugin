@@ -653,3 +653,9 @@ test("loop-config returns a controlled error (not a stack trace) when .copilot-r
   assert.doesNotMatch(r.stderr, /at .*\.mjs:\d+/); // no raw stack frames
   assert.match(r.stderr, /\.copilot-review\.json/);
 });
+
+test("setup command documents the review-gate toggles", () => {
+  const md = readFileSync(join(here, "..", "commands", "setup.md"), "utf8");
+  assert.match(md, /--enable-review-gate/);
+  assert.match(md, /--disable-review-gate/);
+});
