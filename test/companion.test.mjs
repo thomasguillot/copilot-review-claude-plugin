@@ -322,7 +322,7 @@ test("loop-config rejects a non-numeric --min-confidence", () => {
   assert.equal(r.stdout.trim(), "");
 });
 
-import { addDismissed } from "../scripts/lib/loop-state.mjs";
+import { addDismissed, setRound, addAttempted, readState } from "../scripts/lib/loop-state.mjs";
 import { findingId } from "../scripts/lib/loop.mjs";
 
 function companionStdin(args, cwd, input, extraEnv = {}) {
@@ -673,4 +673,17 @@ test("loop-review rejects the gate flags (only valid for setup)", () => {
   const r = companion(["loop-review", "--disable-review-gate"], dir, { COPILOT_GITHUB_TOKEN: "abc" });
   assert.equal(r.code, 2);
   assert.match(r.stderr, /only valid for setup/i);
+});
+
+test("loop-review does not mutate loop state (round/attempted) — safe for the gate to call", () => {
+  const dir = tempRepo();
+  write(dir, "a.txt", "one\n");
+  // Pre-seed state to non-defaults so any clobbering by loop-review would show.
+  setRound(dir, 3);
+  addAttempted(dir, "deadbeef");
+  const r = companion(["loop-review"], dir, { COPILOT_STUB_MODE: "json-findings" });
+  assert.equal(r.code, 0, r.stderr);
+  const s = readState(dir);
+  assert.equal(s.round, 3);                       // round counter untouched
+  assert.deepEqual(s.attempted, ["deadbeef"]);    // attempted set untouched
 });

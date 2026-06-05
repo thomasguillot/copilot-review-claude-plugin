@@ -125,6 +125,19 @@ test("gate review timeout default stays safely under the Stop hook timeout", () 
   assert.ok(internalSeconds < hookTimeout, `internal review timeout (${internalSeconds}s) must be < the Stop hook timeout (${hookTimeout}s)`);
 });
 
+test("hooks.json Stop entries use the command-hook group shape", () => {
+  const manifest = JSON.parse(readFileSync(join(here, "..", "hooks", "hooks.json"), "utf8"));
+  assert.ok(Array.isArray(manifest.hooks.Stop) && manifest.hooks.Stop.length > 0);
+  for (const group of manifest.hooks.Stop) {
+    assert.ok(Array.isArray(group.hooks), "each Stop entry is a matcher group with a hooks array");
+    for (const h of group.hooks) {
+      assert.equal(h.type, "command");
+      assert.equal(typeof h.command, "string");
+      assert.ok(h.command.length > 0);
+    }
+  }
+});
+
 test("enabled gate forces working-tree scope, ignoring .copilot-review.json loop.scope=branch", () => {
   const dir = tempRepo();
   // Commit a change so a branch diff exists, but leave the WORKING TREE clean.

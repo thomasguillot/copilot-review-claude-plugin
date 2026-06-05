@@ -17,7 +17,7 @@ const COMPANION = join(here, "copilot-companion.mjs");
 // Kept safely BELOW the Stop hook's own timeout in hooks.json (900s) so this
 // process has headroom to emit the block decision before Claude Code kills the
 // hook — otherwise a timeout would silently fail OPEN. Overridable via env for tests.
-const REVIEW_TIMEOUT_MS = Number(process.env.COPILOT_REVIEW_GATE_TIMEOUT_MS) || 14 * 60 * 1000;
+const REVIEW_TIMEOUT_MS = Number(process.env.COPILOT_REVIEW_GATE_TIMEOUT_MS) || 12 * 60 * 1000;
 const DISABLE_HINT = "run /copilot-review:setup --disable-review-gate to turn off this gate";
 
 function readHookInput() {
