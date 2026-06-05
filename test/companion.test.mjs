@@ -675,6 +675,23 @@ test("loop-review rejects the gate flags (only valid for setup)", () => {
   assert.match(r.stderr, /only valid for setup/i);
 });
 
+test("setup reports a clean error (no stack trace) when the gate state cannot be written", () => {
+  const dir = tempRepo();
+  // Point the OS temp dir at a regular FILE so mkdirSync(.../copilot-review-loop) fails.
+  const fakeTmp = join(dir, "not-a-dir");
+  write(dir, "not-a-dir", "x"); // create the file
+  const r = companion(["setup", "--enable-review-gate"], dir, {
+    COPILOT_GITHUB_TOKEN: "abc",
+    TMPDIR: fakeTmp,
+    TMP: fakeTmp,
+    TEMP: fakeTmp
+  });
+  assert.equal(r.code, 1);
+  assert.match(r.stderr, /could not update the review gate/i);
+  // The clean message must be present and there must be no raw "Error:"/stack noise on stdout.
+  assert.doesNotMatch(r.stdout, /at Object\.|at \w+ \(/); // no stack frames leaked to stdout
+});
+
 test("loop-review does not mutate loop state (round/attempted) — safe for the gate to call", () => {
   const dir = tempRepo();
   write(dir, "a.txt", "one\n");

@@ -107,9 +107,15 @@ function cmdSetup(flags, cwd) {
     process.exitCode = 2;
     return;
   }
-  if (flags.enableGate) setGateEnabled(cwd, true);
-  else if (flags.disableGate) setGateEnabled(cwd, false);
-  out(`Stop review gate: ${isGateEnabled(cwd) ? "enabled" : "disabled"} (toggle with --enable-review-gate / --disable-review-gate)`);
+  try {
+    if (flags.enableGate) setGateEnabled(cwd, true);
+    else if (flags.disableGate) setGateEnabled(cwd, false);
+    out(`Stop review gate: ${isGateEnabled(cwd) ? "enabled" : "disabled"} (toggle with --enable-review-gate / --disable-review-gate)`);
+  } catch (err) {
+    process.stderr.write(`setup: could not update the review gate: ${err.message}\n`);
+    process.exitCode = 1;
+    return;
+  }
   const avail = binaryAvailable("copilot", ["--version"], { cwd });
   if (!avail.available) {
     out("GitHub Copilot CLI not found.");
