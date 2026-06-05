@@ -7,6 +7,7 @@ import { resolveScope } from "./lib/git.mjs";
 import { buildReviewPrompt, getAuthStatus, parseStructuredReview, probeAuth, runReview } from "./lib/copilot.mjs";
 import { resolveLoopConfig, filterFindings } from "./lib/loop.mjs";
 import { readState, setRound, addDismissed, addAttempted, clearState } from "./lib/loop-state.mjs";
+import { isGateEnabled, setGateEnabled } from "./lib/gate.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const TEMPLATE = join(here, "..", "prompts", "review.md");
@@ -18,11 +19,19 @@ function out(s) {
 
 function parseFlags(rest) {
   const tokens = rest.join(" ").trim().split(/\s+/).filter(Boolean);
-  const flags = { scope: "working-tree", base: null, model: null, probe: false, format: "markdown", error: null, maxRounds: undefined, threshold: undefined, minConfidence: undefined, scopeProvided: false };
+  const flags = { scope: "working-tree", base: null, model: null, probe: false, format: "markdown", error: null, maxRounds: undefined, threshold: undefined, minConfidence: undefined, scopeProvided: false, enableGate: false, disableGate: false };
   for (let i = 0; i < tokens.length; i++) {
     let name = tokens[i];
     if (name === "--probe") {
       flags.probe = true;
+      continue;
+    }
+    if (name === "--enable-review-gate") {
+      flags.enableGate = true;
+      continue;
+    }
+    if (name === "--disable-review-gate") {
+      flags.disableGate = true;
       continue;
     }
     if (name === "--json") {
@@ -81,6 +90,14 @@ function rejectLoopFlags(flags, command) {
 
 function cmdSetup(flags, cwd) {
   if (rejectLoopFlags(flags, "setup")) return;
+  if (flags.enableGate && flags.disableGate) {
+    process.stderr.write("setup: cannot both enable and disable the review gate in one run.\n");
+    process.exitCode = 2;
+    return;
+  }
+  if (flags.enableGate) setGateEnabled(cwd, true);
+  else if (flags.disableGate) setGateEnabled(cwd, false);
+  out(`Stop review gate: ${isGateEnabled(cwd) ? "enabled" : "disabled"} (toggle with --enable-review-gate / --disable-review-gate)`);
   const avail = binaryAvailable("copilot", ["--version"], { cwd });
   if (!avail.available) {
     out("GitHub Copilot CLI not found.");

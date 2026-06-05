@@ -12,8 +12,10 @@ const COMPANION = join(here, "..", "scripts", "copilot-companion.mjs");
 const STUB_DIR = join(here, "fixtures", "bin");
 
 // Run the companion with the stub `copilot` on PATH.
+// Uses process.execPath so the correct node binary is found even when extraEnv
+// replaces PATH entirely (e.g. to simulate a missing tool like copilot).
 function companion(args, cwd, extraEnv = {}) {
-  return run("node", [COMPANION, ...args], {
+  return run(process.execPath, [COMPANION, ...args], {
     cwd,
     env: { ...process.env, PATH: `${STUB_DIR}${delimiter}${process.env.PATH ?? ""}`, ...extraEnv }
   });
@@ -560,6 +562,45 @@ test("setup rejects loop-only flags (fail loud)", () => {
   const r = companion(["setup", "--max-rounds", "3"], dir);
   assert.equal(r.code, 2);
   assert.match(r.stderr, /only valid for the loop/i);
+});
+
+test("setup reports the gate as disabled by default", () => {
+  const dir = tempRepo();
+  const r = companion(["setup"], dir, { COPILOT_GITHUB_TOKEN: "abc" });
+  assert.match(r.stdout, /review gate:\s*disabled/i);
+});
+
+test("setup --enable-review-gate enables the gate and reports it", () => {
+  const dir = tempRepo();
+  const r = companion(["setup", "--enable-review-gate"], dir, { COPILOT_GITHUB_TOKEN: "abc" });
+  assert.equal(r.code, 0, r.stderr);
+  assert.match(r.stdout, /review gate:\s*enabled/i);
+  const r2 = companion(["setup"], dir, { COPILOT_GITHUB_TOKEN: "abc" });
+  assert.match(r2.stdout, /review gate:\s*enabled/i);
+});
+
+test("setup --disable-review-gate turns the gate back off", () => {
+  const dir = tempRepo();
+  companion(["setup", "--enable-review-gate"], dir, { COPILOT_GITHUB_TOKEN: "abc" });
+  const r = companion(["setup", "--disable-review-gate"], dir, { COPILOT_GITHUB_TOKEN: "abc" });
+  assert.equal(r.code, 0, r.stderr);
+  assert.match(r.stdout, /review gate:\s*disabled/i);
+});
+
+test("setup rejects enabling and disabling the gate at once", () => {
+  const dir = tempRepo();
+  const r = companion(["setup", "--enable-review-gate", "--disable-review-gate"], dir, { COPILOT_GITHUB_TOKEN: "abc" });
+  assert.equal(r.code, 2);
+  assert.match(r.stderr, /both .*enable.*disable|cannot .*enable.*disable/i);
+});
+
+test("setup --enable-review-gate persists even when Copilot is unavailable", () => {
+  const dir = tempRepo();
+  const r = companion(["setup", "--enable-review-gate"], dir, {
+    PATH: "/nonexistent-bin-dir",
+    COPILOT_GITHUB_TOKEN: "abc"
+  });
+  assert.match(r.stdout, /review gate:\s*enabled/i);
 });
 
 test("loop-review branch scope with no base errors even when there are uncommitted edits", () => {
