@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";
 import { dirname, join, delimiter } from "node:path";
+import { readFileSync } from "node:fs";
 import { run } from "../scripts/lib/process.mjs";
 import { tempRepo, write } from "./helpers.mjs";
 import { setGateEnabled } from "../scripts/lib/gate.mjs";
@@ -104,4 +105,12 @@ test("enabled gate + review times out: blocks with escape hatch", () => {
   assert.equal(payload.decision, "block");
   assert.match(payload.reason, /timed out or was killed|could not run/);
   assert.match(payload.reason, /disable-review-gate/);
+});
+
+test("hooks.json registers the Stop hook pointing at the gate script", () => {
+  const manifest = JSON.parse(readFileSync(join(here, "..", "hooks", "hooks.json"), "utf8"));
+  assert.ok(manifest.hooks && Array.isArray(manifest.hooks.Stop), "expected a Stop hook array");
+  const cmds = manifest.hooks.Stop.flatMap((g) => g.hooks).map((h) => h.command);
+  assert.ok(cmds.some((c) => /stop-review-gate-hook\.mjs/.test(c)), "Stop hook should run the gate script");
+  assert.ok(cmds.some((c) => c.includes("${CLAUDE_PLUGIN_ROOT}")), "should reference CLAUDE_PLUGIN_ROOT");
 });

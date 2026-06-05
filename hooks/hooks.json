@@ -1,0 +1,16 @@
+{
+  "description": "Optional stop-time Copilot review gate (default off; toggle with /copilot-review:setup --enable-review-gate).",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/stop-review-gate-hook.mjs\"",
+            "timeout": 900
+          }
+        ]
+      }
+    ]
+  }
+}
