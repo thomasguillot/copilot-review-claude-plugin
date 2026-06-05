@@ -5,7 +5,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { binaryAvailable } from "./lib/process.mjs";
 import { resolveScope } from "./lib/git.mjs";
 import { buildReviewPrompt, getAuthStatus, parseStructuredReview, probeAuth, runReview } from "./lib/copilot.mjs";
-import { resolveLoopConfig, filterFindings, findingKey, findingId } from "./lib/loop.mjs";
+import { resolveLoopConfig, filterFindings } from "./lib/loop.mjs";
 import { readState, setRound, addDismissed, addAttempted, clearState } from "./lib/loop-state.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));

@@ -321,7 +321,7 @@ test("loop-config rejects a non-numeric --min-confidence", () => {
 });
 
 import { addDismissed } from "../scripts/lib/loop-state.mjs";
-import { findingKey, findingId } from "../scripts/lib/loop.mjs";
+import { findingId } from "../scripts/lib/loop.mjs";
 
 function companionStdin(args, cwd, input, extraEnv = {}) {
   return run("node", [COMPANION, ...args], {
