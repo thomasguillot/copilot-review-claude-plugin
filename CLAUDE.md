@@ -16,6 +16,11 @@ Claude Code (or the user). End-user install, auth, and usage details live in
   — review the current git changes; Copilot's findings are returned verbatim.
   Default scope is the working tree (uncommitted changes).
   Add `--format json` (alias `--json`) for a validated structured review (`schemas/review-output.schema.json`); markdown remains the default.
+- `/copilot-review:loop [--scope ...] [--base <ref>] [--model <m>] [--threshold ...] [--min-confidence <0..1>] [--max-rounds <n>]`
+  — fix-and-re-review loop (Copilot reviews, Claude fixes) until clean or the round
+  cap. Filters findings by severity threshold + a confidence floor (default 0.7) and
+  honors user dismissals; risky or oscillating findings pause for input. Config via
+  `.copilot-review.json` (`loop` block); flags override. Unlike `review`, this command edits code.
 
 ## Architecture
 
@@ -31,6 +36,9 @@ one-shot per review.
 - `schemas/review-output.schema.json` — the shared finding contract (also consumed by the `the-reviewer` orchestrator).
 - `scripts/lib/schema.mjs` — minimal dependency-free validator used by JSON review mode.
 - `prompts/review-json.md` — the JSON reviewer prompt template.
+- `scripts/lib/loop.mjs` — pure loop helpers: severity ranking, finding keys, findings filter, and loop-config resolution.
+- `scripts/lib/loop-state.mjs` — per-repo loop state (round counter + dismissed + attempted finding ids), stored under the OS temp dir.
+- Companion subcommands `loop-config` / `loop-review` / `state` back the `/copilot-review:loop` command (`filter` is a standalone composable helper: review JSON on stdin → filtered result).
 - `commands/` — the two slash-command definitions.
 - `test/` — `node:test` suite plus a stub `copilot` binary, so it runs without a Copilot subscription.
 

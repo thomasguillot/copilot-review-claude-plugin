@@ -74,6 +74,21 @@ Options: `--scope working-tree|branch`, `--base <ref>`, `--model <model>`.
 Want a review loop? Just tell Claude: "fix the High findings and run
 `/copilot-review:review` again," and repeat until it's clean.
 
+### Review loop (`/copilot-review:loop`)
+
+`/copilot-review:loop` runs Copilot review and applies fixes in a loop until the
+changes are clean or a round cap is reached (default 6). It keeps only findings at
+or above a severity `--threshold` (default: all) and a `--min-confidence` floor
+(default 0.7), so low-confidence noise doesn't stall the loop. Risky or oscillating
+findings pause for your input, where you can accept a fix or dismiss the finding.
+Configure defaults in `.copilot-review.json`:
+
+```json
+{ "loop": { "threshold": "high", "minConfidence": 0.7, "maxRounds": 6 } }
+```
+
+Flags override the file. Unlike `/copilot-review:review`, this command edits code.
+
 ## How it works
 
 A small Node script computes the diff for the chosen scope and passes it to

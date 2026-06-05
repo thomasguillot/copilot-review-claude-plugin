@@ -217,6 +217,37 @@ test("working-tree: untracked binary file is not inlined", () => {
   assert.doesNotMatch(r.text, /\x00/);
 });
 
+test("branch scope with includeWorktree includes uncommitted edits", () => {
+  const dir = tempRepo();
+  write(dir, "a.txt", "base\n");
+  git(dir, "add", "a.txt");
+  git(dir, "commit", "-q", "-m", "base");
+  git(dir, "checkout", "-q", "-b", "feature");
+  write(dir, "a.txt", "base\ncommitted-line\n");
+  git(dir, "add", "a.txt");
+  git(dir, "commit", "-q", "-m", "feature");
+  // Uncommitted edit (a "fix" the loop would apply):
+  write(dir, "a.txt", "base\ncommitted-line\nuncommitted-fix\n");
+  const r = resolveScope({ scope: "branch", cwd: dir, includeWorktree: true });
+  assert.match(r.text, /committed-line/);
+  assert.match(r.text, /uncommitted-fix/); // the key assertion: uncommitted edits are seen
+});
+
+test("branch scope without includeWorktree omits uncommitted edits (unchanged default)", () => {
+  const dir = tempRepo();
+  write(dir, "a.txt", "base\n");
+  git(dir, "add", "a.txt");
+  git(dir, "commit", "-q", "-m", "base");
+  git(dir, "checkout", "-q", "-b", "feature");
+  write(dir, "a.txt", "base\ncommitted-line\n");
+  git(dir, "add", "a.txt");
+  git(dir, "commit", "-q", "-m", "feature");
+  write(dir, "a.txt", "base\ncommitted-line\nuncommitted-only\n");
+  const r = resolveScope({ scope: "branch", cwd: dir }); // default (committed only)
+  assert.match(r.text, /committed-line/);
+  assert.doesNotMatch(r.text, /uncommitted-only/);
+});
+
 test("branch base detection skips the current branch when it equals HEAD", () => {
   const dir = tempRepo();
   // On 'main' with a commit; main === HEAD, so it must NOT be chosen as base.
@@ -228,4 +259,55 @@ test("branch base detection skips the current branch when it equals HEAD", () =>
   assert.match(r.scopeLabel, /no base branch detected/);
   // ...and exposes that as an explicit flag, not just label text.
   assert.equal(r.noBaseDetected, true);
+});
+
+test("branch+includeWorktree uses merge-base (ignores upstream-only commits after divergence)", () => {
+  const dir = tempRepo();
+  write(dir, "a.txt", "base\n");
+  git(dir, "add", "a.txt"); git(dir, "commit", "-q", "-m", "base");
+  git(dir, "checkout", "-q", "-b", "feature");
+  write(dir, "f.txt", "feature\n");
+  git(dir, "add", "f.txt"); git(dir, "commit", "-q", "-m", "feat");
+  // Advance main AFTER branching (divergence):
+  git(dir, "checkout", "-q", "main");
+  write(dir, "u.txt", "upstream\n");
+  git(dir, "add", "u.txt"); git(dir, "commit", "-q", "-m", "upstream-only");
+  git(dir, "checkout", "-q", "feature");
+  const r = resolveScope({ scope: "branch", base: "main", cwd: dir, includeWorktree: true });
+  assert.match(r.text, /f\.txt/);          // branch change present
+  assert.doesNotMatch(r.text, /upstream/); // upstream-only change NOT pulled in (merge-base)
+});
+
+test("branch+includeWorktree includes a new untracked file", () => {
+  const dir = tempRepo();
+  write(dir, "a.txt", "base\n");
+  git(dir, "add", "a.txt"); git(dir, "commit", "-q", "-m", "base");
+  git(dir, "checkout", "-q", "-b", "feature");
+  write(dir, "newfile.txt", "added by a fix\n"); // untracked
+  const r = resolveScope({ scope: "branch", base: "main", cwd: dir, includeWorktree: true });
+  assert.match(r.text, /newfile\.txt/);
+  assert.match(r.text, /added by a fix/);
+});
+
+test("branch: a base ref starting with '-' is rejected (option-injection guard)", () => {
+  const dir = tempRepo();
+  write(dir, "a.txt", "base\n");
+  git(dir, "add", "a.txt"); git(dir, "commit", "-q", "-m", "base");
+  const r = resolveScope({ scope: "branch", base: "--output=/tmp/pwned", cwd: dir, includeWorktree: true });
+  assert.equal(r.isEmpty, true);
+  assert.match(r.error, /starting with '-'|not allowed/i);
+});
+
+test("branch+includeWorktree fails loud when there is no merge base (unrelated histories)", () => {
+  const dir = tempRepo();
+  write(dir, "a.txt", "base\n");
+  git(dir, "add", "a.txt"); git(dir, "commit", "-q", "-m", "base"); // on main
+  // An orphan branch has no common ancestor with main.
+  git(dir, "checkout", "-q", "--orphan", "unrelated");
+  write(dir, "o.txt", "orphan\n");
+  git(dir, "add", "o.txt"); git(dir, "commit", "-q", "-m", "orphan-root");
+  git(dir, "checkout", "-q", "main");
+  const r = resolveScope({ scope: "branch", base: "unrelated", cwd: dir, includeWorktree: true });
+  assert.equal(r.isEmpty, true);
+  assert.match(r.error, /merge base|common ancestor/i);
 });

@@ -118,7 +118,7 @@ function gitFailDetail(res, label, fallback) {
   return `${label}: ${(res.stderr || "").trim() || fallback}`;
 }
 
-export function resolveScope({ scope = "working-tree", base = null, cwd = process.cwd(), maxBytes = 200000 } = {}) {
+export function resolveScope({ scope = "working-tree", base = null, cwd = process.cwd(), maxBytes = 200000, includeWorktree = false } = {}) {
   let segments = [];
   let scopeLabel;
   // Explicit signal that branch scope fell back to HEAD with no detectable base
@@ -152,22 +152,61 @@ export function resolveScope({ scope = "working-tree", base = null, cwd = proces
       };
     }
     const ref = base || detectBase(cwd);
-    noBaseDetected = !base && ref === "HEAD";
-    const baseNote = noBaseDetected ? " — no base branch detected" : "";
-    scopeLabel = `branch diff (${ref}...HEAD)${baseNote}`;
-    const d = run("git", ["diff", "--no-ext-diff", "--no-textconv", `${ref}...HEAD`], { cwd });
-    if (d.code !== 0 || d.error) {
+    // A base ref starting with '-' would be misread by git as an option when
+    // passed positionally (e.g. `--output=<file>` to git diff writes a file).
+    // Reject it before it reaches any git invocation.
+    if (typeof ref === "string" && ref.startsWith("-")) {
       return {
         text: "",
         fileCount: 0,
         truncated: false,
         droppedFiles: [],
         isEmpty: true,
-        scopeLabel,
-        error: gitFailDetail(d, `Could not diff against base '${ref}'`, "git diff failed")
+        scopeLabel: "branch diff",
+        error: `Refusing base ref '${ref}': refs starting with '-' are not allowed (git could misread them as options).`
       };
     }
-    segments = splitDiffSegments(d.stdout);
+    noBaseDetected = !base && ref === "HEAD";
+    const baseNote = noBaseDetected ? " — no base branch detected" : "";
+    if (includeWorktree) {
+      scopeLabel = `branch diff (${ref} vs working tree)${baseNote}`;
+      const mb = run("git", ["merge-base", ref, "HEAD"], { cwd });
+      // Fail loud on a missing merge base (e.g. unrelated histories). Falling
+      // back to `ref` would diff against the base TIP, silently pulling in
+      // upstream-only commits after divergence — the opposite of the
+      // merge-base→working-tree semantics this scope promises. (When no base is
+      // detected, ref === "HEAD" and `merge-base HEAD HEAD` still succeeds.)
+      if (mb.error || mb.code !== 0 || !mb.stdout.trim()) {
+        return { text: "", fileCount: 0, truncated: false, droppedFiles: [], isEmpty: true, scopeLabel, noBaseDetected, error: gitFailDetail(mb, `Could not find a merge base with '${ref}'`, "no common ancestor (unrelated histories?)") };
+      }
+      const baseCommit = mb.stdout.trim();
+      const d = run("git", ["diff", "--no-ext-diff", "--no-textconv", baseCommit], { cwd });
+      if (d.code !== 0 || d.error) {
+        return { text: "", fileCount: 0, truncated: false, droppedFiles: [], isEmpty: true, scopeLabel, noBaseDetected, error: gitFailDetail(d, `Could not diff against base '${ref}'`, "git diff failed") };
+      }
+      const lsRes = run("git", ["ls-files", "--others", "--exclude-standard", "-z"], { cwd });
+      if (lsRes.code !== 0 || lsRes.error) {
+        return { text: "", fileCount: 0, truncated: false, droppedFiles: [], isEmpty: true, scopeLabel, noBaseDetected, error: gitFailDetail(lsRes, "git ls-files failed", "not a git repository?") };
+      }
+      const untracked = lsRes.stdout.split("\0").filter(Boolean);
+      segments = [...splitDiffSegments(d.stdout), ...untrackedSegments(cwd, untracked)];
+    } else {
+      scopeLabel = `branch diff (${ref}...HEAD)${baseNote}`;
+      const d = run("git", ["diff", "--no-ext-diff", "--no-textconv", `${ref}...HEAD`], { cwd });
+      if (d.code !== 0 || d.error) {
+        return {
+          text: "",
+          fileCount: 0,
+          truncated: false,
+          droppedFiles: [],
+          isEmpty: true,
+          scopeLabel,
+          noBaseDetected,
+          error: gitFailDetail(d, `Could not diff against base '${ref}'`, "git diff failed")
+        };
+      }
+      segments = splitDiffSegments(d.stdout);
+    }
   } else {
     scopeLabel = "working tree (uncommitted changes)";
     let trackedRes;
